@@ -1,0 +1,49 @@
+name: deploy-fpu-design-spec
+
+on:
+  push:
+    paths:
+      - "docs/FPU_Design_Spec_v0.4_1.html"
+      - "docs/index.html"
+      - ".github/workflows/deploy-fpu-design-spec.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy-fpu-design-spec
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Validate FPU design spec files
+        run: |
+          test -f docs/FPU_Design_Spec_v0.4_1.html
+          test -f docs/index.html
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload FPU design spec artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy FPU design spec
+        id: deployment
+        uses: actions/deploy-pages@v4
