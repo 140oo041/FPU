@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FPU-130 Design Spec</title>
+  <style>
+    :root {
+      --bg: #f4efe7;
+      --panel: rgba(255, 252, 247, 0.9);
+      --ink: #17212b;
+      --muted: #5f6b76;
+      --accent: #0f766e;
+      --accent-2: #c2410c;
+      --line: rgba(23, 33, 43, 0.12);
+      --shadow: 0 24px 80px rgba(23, 33, 43, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(194, 65, 12, 0.14), transparent 26%),
+        linear-gradient(180deg, #f8f4ec 0%, var(--bg) 100%);
+    }
+
+    .shell {
+      width: min(1200px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 40px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 20px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 0.8rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.1rem, 5vw, 4rem);
+      line-height: 0.95;
+      font-weight: 700;
+    }
+
+    .lede {
+      margin: 0;
+      max-width: 58rem;
+      font-size: 1.05rem;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    code {
+      padding: 0.08rem 0.35rem;
+      border-radius: 0.35rem;
+      background: rgba(23, 33, 43, 0.08);
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92em;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 600;
+      background: #fff;
+    }
+
+    .button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .fact {
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .fact strong {
+      display: block;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin-bottom: 6px;
+    }
+
+    .fact span {
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+
+    .viewer {
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: var(--shadow);
+    }
+
+    .viewer-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 4px 6px 10px;
+    }
+
+    .viewer-header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .viewer-header p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    iframe {
+      width: 100%;
+      height: min(78vh, 1000px);
+      border: 0;
+      border-radius: 16px;
+      background: #fff;
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        width: min(100% - 20px, 1200px);
+        padding-top: 20px;
+      }
+
+      .hero,
+      .viewer {
+        padding: 18px;
+        border-radius: 18px;
+      }
+
+      iframe {
+        height: 70vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">Tiny Tapeout Numeric Coprocessor</p>
+      <h1>FPU-130 Design Specification</h1>
+      <p class="lede">
+        Build-ready specification for a compact <code>bfloat16</code> floating-point unit targeting Tiny Tapeout.
+        The design uses an iterative datapath, SPI command transport, optional burst-mode operand streaming,
+        CRC-protected frames, and a 16-bit accumulator for chained operations.
+      </p>
+
+      <div class="actions">
+        <a class="button primary" href="./FPU_Design_Spec_v0.4_1.html">Open Spec</a>
+        <a class="button" href="https://github.com/140oo041/FPU">View Repository</a>
+      </div>
+
+      <div class="facts">
+        <div class="fact">
+          <strong>Format</strong>
+          <span><code>bfloat16</code></span>
+        </div>
+        <div class="fact">
+          <strong>Core Clock</strong>
+          <span><code>40 MHz</code></span>
+        </div>
+        <div class="fact">
+          <strong>SPI</strong>
+          <span>Mode 0, up to <code>10 MHz</code></span>
+        </div>
+        <div class="fact">
+          <strong>Ops</strong>
+          <span><code>ADD SUB MUL DIV NEG ABS SLT NOP</code></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="viewer">
+      <div class="viewer-header">
+        <h2>Embedded Spec</h2>
+        <p>Direct file: <a href="./FPU_Design_Spec_v0.4_1.html"><code>docs/FPU_Design_Spec_v0.4_1.html</code></a></p>
+      </div>
+      <iframe
+        src="./FPU_Design_Spec_v0.4_1.html"
+        title="FPU-130 Design Specification"
+        loading="lazy"></iframe>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FPU-130 — Design Specification (Rev 0.4)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --ink:#14181F;
+    --paper:#FAFBFC;
+    --panel:#FFFFFF;
+    --teal:#0E7490;      /* datapath */
+    --teal-soft:#CFF0F4;
+    --amber:#C2410C;     /* frames / accent (echoes source diagrams) */
+    --amber-soft:#FBE6D8;
+    --slate:#334155;     /* control */
+    --slate-soft:#E4E8EE;
+    --line:#E2E6EB;
+    --line-strong:#C7CDD6;
+    --muted:#64748B;
+    --grid:#EEF1F4;
+    --good:#15803D;
+    --warn:#B45309;
+    --bad:#B91C1C;
+    --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+    --disp:'Space Grotesk','Inter',system-ui,sans-serif;
+    --body:'Inter',system-ui,-apple-system,sans-serif;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--body);font-size:16px;line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:0 28px 120px}
+
+  /* ---------- masthead ---------- */
+  .mast{
+    border-bottom:2px solid var(--ink);
+    padding:46px 0 22px;margin-bottom:8px;
+  }
+  .mast .eyebrow{
+    font-family:var(--mono);font-size:12px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--amber);font-weight:600;
+  }
+  .mast h1{
+    font-family:var(--disp);font-weight:700;letter-spacing:-.02em;
+    font-size:clamp(34px,6vw,58px);line-height:1.02;margin:.18em 0 .12em;
+  }
+  .mast h1 .dim{color:var(--muted)}
+  .mast .sub{font-size:18px;color:var(--slate);max-width:60ch;margin:0}
+  .metarow{
+    display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:22px;
+    font-family:var(--mono);font-size:12px;
+  }
+  .chip{
+    border:1px solid var(--line-strong);border-radius:2px;padding:5px 10px;
+    background:var(--panel);color:var(--slate);
+  }
+  .chip b{color:var(--ink);font-weight:600}
+  .chip.amber{border-color:var(--amber);color:var(--amber);background:var(--amber-soft)}
+
+  /* ---------- structural ---------- */
+  section{padding-top:54px;scroll-margin-top:20px}
+  .secnum{
+    font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;
+    letter-spacing:.12em;
+  }
+  h2{
+    font-family:var(--disp);font-weight:600;letter-spacing:-.015em;
+    font-size:clamp(24px,3.6vw,34px);margin:.12em 0 .5em;line-height:1.08;
+    border-bottom:1px solid var(--line);padding-bottom:.34em;
+  }
+  h3{
+    font-family:var(--disp);font-weight:600;font-size:20px;
+    margin:1.8em 0 .5em;letter-spacing:-.01em;
+  }
+  h4{
+    font-family:var(--mono);font-size:13px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--muted);margin:1.5em 0 .4em;font-weight:600;
+  }
+  p{margin:.7em 0}
+  a{color:var(--teal)}
+  ul,ol{margin:.6em 0;padding-left:1.3em}
+  li{margin:.32em 0}
+  strong{font-weight:600}
+  code,.k{
+    font-family:var(--mono);font-size:.9em;background:var(--slate-soft);
+    padding:.08em .4em;border-radius:3px;color:var(--slate);
+  }
+  .lead{font-size:18px;color:var(--slate)}
+
+  /* ---------- TOC ---------- */
+  .toc{
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    padding:22px 26px;margin-top:30px;
+    column-count:2;column-gap:40px;
+  }
+  @media(max-width:640px){.toc{column-count:1}}
+  .toc a{
+    display:block;text-decoration:none;color:var(--slate);
+    font-size:14.5px;padding:5px 0;border-bottom:1px dotted var(--line);
+    break-inside:avoid;
+  }
+  .toc a:hover{color:var(--amber)}
+  .toc a .n{font-family:var(--mono);color:var(--amber);margin-right:10px;font-size:12px}
+
+  /* ---------- callouts ---------- */
+  .note{
+    border-left:3px solid var(--line-strong);background:var(--panel);
+    padding:14px 18px;margin:18px 0;border-radius:0 6px 6px 0;font-size:15px;
+  }
+  .note .tag{
+    font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    font-weight:600;display:block;margin-bottom:4px;
+  }
+  .note.decision{border-left-color:var(--amber);background:var(--amber-soft)}
+  .note.decision .tag{color:var(--amber)}
+  .note.fix{border-left-color:var(--teal);background:var(--teal-soft)}
+  .note.fix .tag{color:var(--teal)}
+  .note.open{border-left-color:var(--warn);background:#FDF6EC}
+  .note.open .tag{color:var(--warn)}
+
+  /* ---------- figures ---------- */
+  figure{margin:26px 0;}
+  .fig-frame{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:22px;overflow-x:auto;
+  }
+  figure svg{display:block;max-width:100%;height:auto;margin:0 auto}
+  figcaption{
+    font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:12px;
+    text-align:center;letter-spacing:.02em;
+  }
+  figcaption b{color:var(--amber);font-weight:600}
+
+  /* ---------- tables ---------- */
+  .tbl{width:100%;border-collapse:collapse;margin:20px 0;font-size:14.5px}
+  .tbl th,.tbl td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  .tbl th{
+    background:var(--slate);color:#fff;font-family:var(--mono);font-weight:500;
+    font-size:12.5px;letter-spacing:.03em;
+  }
+  .tbl tr:nth-child(even) td{background:#FAFBFC}
+  .tbl td.m,.tbl th.m{font-family:var(--mono)}
+  .tbl .grp td{background:var(--slate-soft);font-weight:600;font-family:var(--mono);font-size:12.5px}
+  .tag-op{font-family:var(--mono);font-weight:600;color:var(--teal)}
+
+  /* small kv grid */
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:20px 0}
+  .kv div{background:var(--panel);padding:12px 16px}
+  .kv .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .kv .val{font-family:var(--disp);font-size:19px;font-weight:600;margin-top:2px}
+  .kv .val small{font-size:13px;color:var(--muted);font-weight:400}
+
+  hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+  .footer{margin-top:80px;padding-top:24px;border-top:2px solid var(--ink);font-family:var(--mono);font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ MASTHEAD ============ -->
+  <header class="mast">
+    <div class="eyebrow">Tiny Tapeout · Sky130 · Digital ASIC · Design Specification</div>
+    <h1>FPU&#8209;130 <span class="dim">/ numeric coprocessor</span></h1>
+    <p class="sub">An area&#8209;optimized 8&#8209;bit arithmetic unit for a single Sky130 Tiny Tapeout tile, driven over SPI and a parallel full&#8209;duplex byte port from the demo&#8209;board host.</p>
+    <div class="metarow">
+      <span class="chip">Document <b>Rev 0.4 — bf16 + status byte</b></span>
+      <span class="chip">Supersedes <b>Rev 0.3 (bf16, single CRC)</b></span>
+      <span class="chip">Target <b>ttsky · 130 nm</b></span>
+      <span class="chip">Date <b>2026-06-22</b></span>
+      <span class="chip amber">Status: DRAFT — decisions pending</span>
+    </div>
+  </header>
+
+  <p class="lead">This revision takes the original four&#8209;page sketch and works it up into a build&#8209;ready specification: a defined number format (<strong>bfloat16</strong>), a complete pin map, exact SPI and handshake timing at the chosen <strong>40 MHz core / 10 MHz SCK</strong> operating point, a full instruction set, a host&#8209;supplied <strong>control byte</strong> and FPU&#8209;returned <strong>status byte</strong>, the datapath micro&#8209;architecture, a clean control FSM, the CRC definition, an area budget, and a verification plan. Points where the original document was silent, ambiguous, or self&#8209;contradictory are flagged inline as <strong>Design Decisions</strong> (a choice has been proposed — please confirm), <strong>Corrections</strong> (an error in an earlier revision was fixed), or <strong>Open Issues</strong> (still needs your input).</p>
+
+  <div class="note">
+    <span class="tag" style="color:var(--muted)">Revision history</span>
+    <strong>0.1</strong> original sketch · <strong>0.2</strong> expanded draft (E4M3, per&#8209;operand CRC) · <strong>0.3</strong> switched format to <strong>bfloat16</strong> and consolidated to a single operand&#8209;region CRC · <strong>0.4</strong> fixed operating point (40 MHz core, 10 MHz SCK, 4× oversampling) and added the host&#8209;to&#8209;FPU control byte + FPU&#8209;to&#8209;host status byte.
+  </div>
+
+  <!-- ============ TOC ============ -->
+  <nav class="toc">
+    <a href="#s1"><span class="n">1</span>Introduction &amp; Scope</a>
+    <a href="#s2"><span class="n">2</span>Key Design Decisions</a>
+    <a href="#s3"><span class="n">3</span>Target Platform</a>
+    <a href="#s4"><span class="n">4</span>Number Format</a>
+    <a href="#s5"><span class="n">5</span>Top-Level Architecture</a>
+    <a href="#s6"><span class="n">6</span>Pin Interface</a>
+    <a href="#s7"><span class="n">7</span>SPI Interface</a>
+    <a href="#s8"><span class="n">8</span>Parallel Full-Duplex Port</a>
+    <a href="#s9"><span class="n">9</span>Instruction Set</a>
+    <a href="#s10"><span class="n">10</span>Control Modes</a>
+    <a href="#s11"><span class="n">11</span>CRC Definition</a>
+    <a href="#s12"><span class="n">12</span>Datapath Micro-architecture</a>
+    <a href="#s13"><span class="n">13</span>Control Unit FSM</a>
+    <a href="#s14"><span class="n">14</span>Worked Transactions</a>
+    <a href="#s15"><span class="n">15</span>Area &amp; Gate Budget</a>
+    <a href="#s16"><span class="n">16</span>Reset, Clocking &amp; Power</a>
+    <a href="#s17"><span class="n">17</span>Verification Plan</a>
+    <a href="#s18"><span class="n">18</span>Open Issues &amp; Roadmap</a>
+  </nav>
+
+  <!-- ============ 1. INTRO ============ -->
+  <section id="s1">
+    <div class="secnum">SECTION 01</div>
+    <h2>Introduction &amp; Scope</h2>
+    <p>FPU&#8209;130 is a small numeric coprocessor intended to be fabricated as a digital design on a Tiny Tapeout Sky130 shuttle. It receives operands and a command from a host (the demo board's RP2040, or any SPI controller), performs one arithmetic or logic operation, and returns the result. The whole design must fit the severe area budget of a Tiny Tapeout tile while still supporting multiply and divide, so the architecture trades latency for area: complex operations are <em>iterative</em> and take multiple clock cycles rather than being fully combinational.</p>
+
+    <h4>Goals</h4>
+    <ul>
+      <li><strong>Maximize useful arithmetic per gate.</strong> Reuse one add/subtract core across add, subtract, multiply, and divide instead of building separate units.</li>
+      <li><strong>Two host transports.</strong> A low&#8209;pin&#8209;count SPI command/data channel, plus a faster parallel byte port with valid/ready flow control for streaming ("burst") workloads.</li>
+      <li><strong>Integrity.</strong> Every frame on either transport carries a CRC so the host can detect corrupted commands or operands.</li>
+      <li><strong>Self&#8209;contained.</strong> No external memory; one accumulator register lets results be chained without re&#8209;sending an operand.</li>
+    </ul>
+
+    <h4>Scope of this document</h4>
+    <p>This is an <em>interface and micro&#8209;architecture</em> specification: it defines externally observable behavior (pins, protocols, instruction semantics, timing) and the internal block structure precisely enough to write RTL against. It does <em>not</em> include the Verilog source, the synthesis scripts, the physical floorplan, or the test&#8209;bench code; those are downstream deliverables that must conform to this document.</p>
+
+    <h4>Glossary</h4>
+    <table class="tbl">
+      <tr><th>Term</th><th>Meaning</th></tr>
+      <tr><td class="m">Tile</td><td>The unit of silicon area on Tiny Tapeout, ≈160×100 µm, ≈1000 logic gates. Multiple tiles can be purchased for one project.</td></tr>
+      <tr><td class="m">Host</td><td>The controller driving FPU&#8209;130 — normally the RP2040 on the demo board, scripted in MicroPython.</td></tr>
+      <tr><td class="m">Frame</td><td>One fixed&#8209;length unit of serial/parallel transfer (e.g. the 8&#8209;bit instruction frame).</td></tr>
+      <tr><td class="m">Burst</td><td>Mode in which operands arrive over the parallel port rather than over SPI.</td></tr>
+      <tr><td class="m">Accumulate</td><td>Mode in which the previous result is used as the first operand.</td></tr>
+      <tr><td class="m">op1 / op2</td><td>First and second operand of a binary operation.</td></tr>
+    </table>
+  </section>
+
+  <!-- ============ 2. DECISIONS ============ -->
+  <section id="s2">
+    <div class="secnum">SECTION 02</div>
+    <h2>Key Design Decisions</h2>
+    <p>Earlier revisions left several load&#8209;bearing questions unanswered — most importantly what an operand actually <em>is</em>. These are the decisions now locked in; each is also explained where it is used.</p>
+
+    <div class="note decision">
+      <span class="tag">Design Decision — D1 · Number format = bfloat16</span>
+      Operands and results are <strong>bfloat16</strong> (1 sign · 8 exponent · 7 mantissa, 16 bits). This gives fp32&#8209;width dynamic range and is a recognized ML format, so host conversion is a plain fp32 truncation. The cost vs. an 8&#8209;bit format: operands are now <strong>two bytes</strong>, registers are 16&#8209;bit, and the significand multiply is a full 8×8. See §4.
+    </div>
+    <div class="note decision">
+      <span class="tag">Design Decision — D2 · Iterative datapath</span>
+      A combinational 8×8 significand multiply alone can consume a whole tile. <strong>A single shared add/sub core is sequenced over multiple cycles</strong> for MUL and DIV. Costs latency (≈4–10 cycles), saves the majority of the area. See §14.
+    </div>
+    <div class="note decision">
+      <span class="tag">Design Decision — D3 · Pin map aligned to Tiny Tapeout SPI convention</span>
+      Tiny Tapeout's recommended SPI mapping is <code>uio[0]=CS uio[1]=MOSI uio[2]=MISO uio[3]=SCK</code>. The four full&#8209;duplex status signals take <code>uio[4..7]</code>. The dedicated input byte uses <code>ui_in</code>, the result byte uses <code>uo_out</code>. See §6.
+    </div>
+    <div class="note decision">
+      <span class="tag">Design Decision — D4 · One CRC over the operand region</span>
+      The instruction byte keeps its own <strong>CRC&#8209;3/GSM</strong> (poly <code>0x3</code>), validated first. The control byte and all operand bytes are then covered by a <em>single</em> <strong>CRC&#8209;8/SMBUS</strong> (poly <code>0x07</code>); the payload length is fixed by the opcode (and the <code>acc</code> bit), so no per&#8209;operand CRC is needed to delimit anything. See §13.
+    </div>
+    <div class="note decision">
+      <span class="tag">Design Decision — D6 · Operating point = 40 MHz core / 10 MHz SCK</span>
+      The core clocks at <strong>40 MHz</strong>; SPI SCK runs at <strong>10 MHz</strong>, giving exactly <strong>4× oversampling</strong> — the minimum safe ratio. Two board clocks per SCK phase; usable but thin margin against SCK duty&#8209;cycle distortion. SCK is therefore capped at board&#8209;clock ÷ 4. See §7.
+    </div>
+    <div class="note decision">
+      <span class="tag">Design Decision — D7 · Control byte in, status byte out</span>
+      The host sends an 8&#8209;bit <strong>control byte</strong> (rounding mode, clear&#8209;ACC, clear&#8209;flags, saturate, 2&#8209;bit tag) as the first byte of the CRC&#8209;protected payload. The FPU returns an 8&#8209;bit <strong>status byte</strong> (busy, nan, ovf, unf, inexact, err, tag&#8209;echo). See §11.
+    </div>
+    <div class="note open">
+      <span class="tag">Open Issue — confirm tile count</span>
+      With bfloat16 the 16&#8209;bit register file and the full 8×8 iterative significand multiply push the estimate (§15) clearly past one tile. <strong>Budget 2 tiles — plan a 2×2 footprint</strong> for routing headroom. If area must shrink, the cheapest single cut is dropping <code>DIV</code>.
+    </div>
+  </section>
+
+  <!-- ============ 3. PLATFORM ============ -->
+  <section id="s3">
+    <div class="secnum">SECTION 03</div>
+    <h2>Target Platform</h2>
+    <p>FPU&#8209;130 targets a Tiny Tapeout Sky130 shuttle, mounted on the TT demo board and exercised by the on&#8209;board RP2040. Tiny Tapeout exposes a fixed, standard interface to every project; the design must use exactly those pins.</p>
+
+    <div class="kv">
+      <div><div class="lbl">Process</div><div class="val">Sky130 <small>130 nm, 1.8 V core</small></div></div>
+      <div><div class="lbl">Tile budget</div><div class="val">≈1000 gates <small>per 160×100 µm tile</small></div></div>
+      <div><div class="lbl">Dedicated inputs</div><div class="val">8 <small>ui_in[7:0]</small></div></div>
+      <div><div class="lbl">Dedicated outputs</div><div class="val">8 <small>uo_out[7:0]</small></div></div>
+      <div><div class="lbl">Bidirectional</div><div class="val">8 <small>uio[7:0] + uio_oe</small></div></div>
+      <div><div class="lbl">Housekeeping</div><div class="val">clk · rst_n · ena</div></div>
+    </div>
+
+    <p>The 24 user pins divide into three groups of eight: <code>ui_in</code> (input&#8209;only), <code>uo_out</code> (output&#8209;only), and <code>uio</code> (bidirectional, each pin's direction set by the matching bit of <code>uio_oe</code>). A global <code>clk</code>, an active&#8209;low <code>rst_n</code>, and a tile&#8209;enable <code>ena</code> are also provided. The host RP2040 can drive all of these and can read <code>uo_out</code> back, which is exactly the channel FPU&#8209;130 uses to return results.</p>
+
+    <div class="note fix">
+      <span class="tag">Correction — C1 · "bidirectional" clarified</span>
+      Rev 0.1 says "SPI used bidirectional pins." To be precise: the <code>uio</code> <em>bus</em> is configurable, but each individual <code>uio</code> wire has a single direction at a time, fixed by <code>uio_oe</code>. FPU&#8209;130 assigns each <code>uio</code> pin a constant direction (e.g. MISO is always an output, MOSI always an input), so no wire is ever driven from both ends. The <code>uio_oe</code> mask is therefore a constant: <code>0x64</code> (outputs on bits 2, 5, 6 — see §6).
+    </div>
+
+    <div class="note open">
+      <span class="tag">Open Issue — budget figures from Rev 0.1</span>
+      The "$400 budget / $100 dev&#8209;kit / ≈1000 gates per tile" numbers are carried over from your draft as project assumptions. Tile and dev&#8209;kit pricing changes per shuttle, so confirm current figures on the Tiny Tapeout pricing page before committing. The gate budget (≈1000/tile) is consistent with current TT documentation.
+    </div>
+  </section>
+
+  <!-- ============ 4. NUMBER FORMAT ============ -->
+  <section id="s4">
+    <div class="secnum">SECTION 04</div>
+    <h2>Number Format</h2>
+    <p>Every operand and result in FPU&#8209;130 is a <strong>bfloat16</strong> value: a 16&#8209;bit floating&#8209;point number with a 1&#8209;bit sign, an 8&#8209;bit exponent (bias 127, identical to fp32), and a 7&#8209;bit mantissa with an implicit leading 1 for normal values. Because the fields match the top half of an IEEE&#8209;754 fp32, a host produces a bf16 simply by truncating (or round&#8209;to&#8209;nearest&#8209;even) the upper 16 bits of an fp32 — conversion is trivial and the dynamic range is the same as fp32 (~10<sup>±38</sup>).</p>
+
+    <h3>4.1 Field layout — two bytes</h3>
+    <p>A bf16 value does not fit in one byte, so every operand and result crosses the 8&#8209;bit interface as <strong>two bytes</strong>. The 8&#8209;bit exponent straddles the byte boundary: 7 of its bits sit in the high byte alongside the sign, and its least&#8209;significant bit sits in the low byte alongside the mantissa. Bytes travel <strong>high byte first</strong> to stay consistent with MSB&#8209;first SPI.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 660 150" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace">
+          <g font-size="11" fill="#64748B" text-anchor="middle">
+            <text x="61" y="28">15</text><text x="97" y="28">14</text><text x="133" y="28">13</text><text x="169" y="28">12</text>
+            <text x="205" y="28">11</text><text x="241" y="28">10</text><text x="277" y="28">9</text><text x="313" y="28">8</text>
+            <text x="349" y="28">7</text><text x="385" y="28">6</text><text x="421" y="28">5</text><text x="457" y="28">4</text>
+            <text x="493" y="28">3</text><text x="529" y="28">2</text><text x="565" y="28">1</text><text x="601" y="28">0</text>
+          </g>
+          <rect x="44" y="34" width="34" height="50" rx="3" fill="#FBE6D8" stroke="#C2410C" stroke-width="1"/>
+          <g fill="#E4E8EE" stroke="#334155" stroke-width="0.5">
+            <rect x="80" y="34" width="34" height="50" rx="3"/><rect x="116" y="34" width="34" height="50" rx="3"/>
+            <rect x="152" y="34" width="34" height="50" rx="3"/><rect x="188" y="34" width="34" height="50" rx="3"/>
+            <rect x="224" y="34" width="34" height="50" rx="3"/><rect x="260" y="34" width="34" height="50" rx="3"/>
+            <rect x="296" y="34" width="34" height="50" rx="3"/><rect x="332" y="34" width="34" height="50" rx="3"/>
+          </g>
+          <g fill="#CFF0F4" stroke="#0E7490" stroke-width="0.5">
+            <rect x="368" y="34" width="34" height="50" rx="3"/><rect x="404" y="34" width="34" height="50" rx="3"/>
+            <rect x="440" y="34" width="34" height="50" rx="3"/><rect x="476" y="34" width="34" height="50" rx="3"/>
+            <rect x="512" y="34" width="34" height="50" rx="3"/><rect x="548" y="34" width="34" height="50" rx="3"/>
+            <rect x="584" y="34" width="34" height="50" rx="3"/>
+          </g>
+          <line x1="349" y1="22" x2="349" y2="92" stroke="#94A3B8" stroke-width="1" stroke-dasharray="4 3"/>
+          <g text-anchor="middle" font-weight="600">
+            <text x="61" y="63" font-size="14" fill="#C2410C">S</text>
+            <text x="205" y="63" font-size="13" fill="#334155">exponent (8)</text>
+            <text x="493" y="63" font-size="13" fill="#0E7490">mantissa (7)</text>
+          </g>
+          <g font-size="11" fill="#64748B" text-anchor="middle">
+            <text x="187" y="104">high byte [15:8] — sent first</text>
+            <text x="475" y="104">low byte [7:0] — second</text>
+            <text x="330" y="130" fill="#14181F">8-bit exponent crosses the byte split: 7 bits high, 1 bit low</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>Fig 4.1</b> — bfloat16 layout. Sign[15], exponent[14:7], mantissa[6:0]; transmitted as two bytes, high byte first.</figcaption>
+    </figure>
+
+    <table class="tbl">
+      <tr><th>Property</th><th class="m">Value</th><th>Notes</th></tr>
+      <tr><td>Exponent bias</td><td class="m">127</td><td>stored = actual + 127 (same as fp32)</td></tr>
+      <tr><td>Largest finite</td><td class="m">≈ 3.39 × 10³⁸</td><td>S=0, E=11111110, M=1111111</td></tr>
+      <tr><td>Smallest normal</td><td class="m">≈ 1.18 × 10⁻³⁸</td><td>E=00000001, M=0000000</td></tr>
+      <tr><td>Precision</td><td class="m">~2–3 decimal digits</td><td>8-bit significand (7 stored + implicit 1)</td></tr>
+      <tr><td>Zero / Inf</td><td class="m">±0 · ±Inf</td><td>E=0 / E=255, M=0 (fp32-compatible)</td></tr>
+      <tr><td>NaN</td><td class="m">E=255, M≠0</td><td>fp32-compatible quiet/signalling encodings</td></tr>
+    </table>
+
+    <p><strong>What it costs in the datapath.</strong> bf16's significand is 8 bits (7 stored + the implicit 1), so <code>MUL</code> is a full <strong>8×8</strong> significand multiply and <code>DIV</code> an 8&#8209;bit iterative divide — there is no small&#8209;mantissa shortcut. The exponent path is 8 bits wide and the aligner/normalizer work on 8&#8209;bit significands. All of this is still sequenced through the one shared add/sub core (§12), just wider and a few more cycles than a minifloat would need.</p>
+
+    <h3>4.2 Why bfloat16</h3>
+    <table class="tbl">
+      <tr><th>Property</th><th>Benefit</th></tr>
+      <tr><td class="m">fp32-width exponent</td><td>Huge dynamic range; rarely overflows/underflows in practice — robust for the host's data.</td></tr>
+      <tr><td class="m">Top 16 bits of fp32</td><td>Host conversion is a truncation; no lookup tables or complex packing on either side.</td></tr>
+      <tr><td class="m">Recognized ML format</td><td>Reference models and test vectors are widely available, simplifying §17 verification.</td></tr>
+      <tr><td class="m">8-bit significand</td><td>Multiply/divide stay 8&#8209;bit — affordable iteratively, though larger than a 4-bit minifloat.</td></tr>
+    </table>
+
+    <div class="note decision">
+      <span class="tag">Design Decision — D1 (restated)</span>
+      The document assumes <strong>bfloat16</strong> throughout. Only §12 (datapath) and the ALU semantics in §9 depend on the format; the pin map, SPI framing, control/status bytes, handshake, CRC, and FSM are all format&#8209;agnostic and would be unchanged by a different float width.
+    </div>
+  </section>
+
+  <!-- ============ 5. ARCHITECTURE ============ -->
+  <section id="s5">
+    <div class="secnum">SECTION 05</div>
+    <h2>Top-Level Architecture</h2>
+    <p>FPU&#8209;130 is five blocks: two transport handlers (SPI and the parallel I/O port), a register file, the iterative datapath, and a control unit that sequences everything. The redrawn block diagram below tightens up the Rev 0.1 sketch and shows the actual signal grouping on the pins.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+          <defs>
+            <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L7,3 L0,6 Z" fill="#64748B"/>
+            </marker>
+          </defs>
+          <!-- chip boundary -->
+          <rect x="230" y="20" width="650" height="430" rx="8" fill="none" stroke="#14181F" stroke-width="2"/>
+          <text x="245" y="44" font-family="IBM Plex Mono, monospace" font-size="12" fill="#64748B">tt_um_fpu130</text>
+
+          <!-- pin groups (left) -->
+          <g font-family="IBM Plex Mono, monospace" font-size="11">
+            <rect x="20" y="60" width="150" height="70" rx="5" fill="#FBE6D8" stroke="#C2410C" stroke-width="1.5"/>
+            <text x="95" y="86" text-anchor="middle" font-size="12" font-weight="600" fill="#C2410C">uio[3:0]</text>
+            <text x="95" y="106" text-anchor="middle" fill="#9A3412">SPI: SCK CS</text>
+            <text x="95" y="120" text-anchor="middle" fill="#9A3412">MOSI MISO</text>
+
+            <rect x="20" y="150" width="150" height="70" rx="5" fill="#FBE6D8" stroke="#C2410C" stroke-width="1.5"/>
+            <text x="95" y="176" text-anchor="middle" font-size="12" font-weight="600" fill="#C2410C">uio[7:4]</text>
+            <text x="95" y="196" text-anchor="middle" fill="#9A3412">in_valid in_ready</text>
+            <text x="95" y="210" text-anchor="middle" fill="#9A3412">out_valid out_ready</text>
+
+            <rect x="20" y="250" width="150" height="50" rx="5" fill="#F1F5F9" stroke="#334155" stroke-width="1.5"/>
+            <text x="95" y="272" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">ui_in[7:0]</text>
+            <text x="95" y="290" text-anchor="middle" fill="#475569">byte in</text>
+
+            <rect x="20" y="320" width="150" height="50" rx="5" fill="#F1F5F9" stroke="#334155" stroke-width="1.5"/>
+            <text x="95" y="342" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">uo_out[7:0]</text>
+            <text x="95" y="360" text-anchor="middle" fill="#475569">byte out</text>
+          </g>
+
+          <!-- internal blocks -->
+          <!-- SPI handler -->
+          <rect x="270" y="60" width="150" height="90" rx="6" fill="#fff" stroke="#94A3B8" stroke-width="1.5"/>
+          <text x="345" y="100" text-anchor="middle" font-size="14" font-weight="600" fill="#334155">SPI Handler</text>
+          <text x="345" y="120" text-anchor="middle" font-size="11" fill="#64748B" font-family="IBM Plex Mono, monospace">shift reg · CRC3/8</text>
+          <!-- IO handler -->
+          <rect x="270" y="250" width="150" height="120" rx="6" fill="#fff" stroke="#94A3B8" stroke-width="1.5"/>
+          <text x="345" y="296" text-anchor="middle" font-size="14" font-weight="600" fill="#334155">I/O Handler</text>
+          <text x="345" y="316" text-anchor="middle" font-size="11" fill="#64748B" font-family="IBM Plex Mono, monospace">valid/ready</text>
+          <text x="345" y="332" text-anchor="middle" font-size="11" fill="#64748B" font-family="IBM Plex Mono, monospace">handshake · CRC8</text>
+          <!-- control unit -->
+          <rect x="490" y="120" width="150" height="230" rx="6" fill="#334155" stroke="#1E293B" stroke-width="1.5"/>
+          <text x="565" y="228" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Control Unit</text>
+          <text x="565" y="248" text-anchor="middle" font-size="11" fill="#CBD5E1" font-family="IBM Plex Mono, monospace">FSM · decode</text>
+          <!-- register file -->
+          <rect x="690" y="60" width="160" height="90" rx="6" fill="#fff" stroke="#94A3B8" stroke-width="1.5"/>
+          <text x="770" y="100" text-anchor="middle" font-size="14" font-weight="600" fill="#334155">Register File</text>
+          <text x="770" y="120" text-anchor="middle" font-size="11" fill="#64748B" font-family="IBM Plex Mono, monospace">A · B · ACC</text>
+          <!-- datapath -->
+          <rect x="690" y="200" width="160" height="150" rx="6" fill="#0E7490" stroke="#0B5A70" stroke-width="1.5"/>
+          <text x="770" y="266" text-anchor="middle" font-size="15" font-weight="600" fill="#fff">Datapath</text>
+          <text x="770" y="286" text-anchor="middle" font-size="11" fill="#CFF0F4" font-family="IBM Plex Mono, monospace">add/sub core</text>
+          <text x="770" y="302" text-anchor="middle" font-size="11" fill="#CFF0F4" font-family="IBM Plex Mono, monospace">mul/div seq · norm</text>
+
+          <!-- connections pins->blocks -->
+          <g stroke="#64748B" stroke-width="1.4" fill="none" marker-end="url(#ar)">
+            <path d="M170,95 L268,95"/>
+            <path d="M170,185 L240,185 L240,300 L268,300"/>
+            <path d="M170,275 L268,275"/>
+            <path d="M345,368 L345,392 L170,392 L170,368"/> <!-- out path approx -->
+          </g>
+          <!-- redraw out arrow cleanly -->
+          <g stroke="#64748B" stroke-width="1.4" fill="none">
+            <path d="M268,345 L210,345 L210,345" marker-end="url(#ar)" transform="translate(0,0)"/>
+          </g>
+
+          <!-- blocks -> control -->
+          <g stroke="#64748B" stroke-width="1.4" fill="none" marker-end="url(#ar)">
+            <path d="M420,105 L455,105 L455,180 L488,180"/>
+            <path d="M420,300 L455,300 L455,260 L488,260"/>
+          </g>
+          <!-- control <-> datapath / regfile -->
+          <g stroke="#64748B" stroke-width="1.4" fill="none">
+            <path d="M640,160 L688,105" marker-end="url(#ar)"/>
+            <path d="M640,300 L688,275" marker-end="url(#ar)"/>
+            <path d="M690,150 L770,150 L770,198" marker-end="url(#ar)"/>
+          </g>
+
+          <!-- clk/rst bottom -->
+          <g font-family="IBM Plex Mono, monospace" font-size="11">
+            <text x="565" y="438" text-anchor="middle" fill="#64748B">clk · rst_n · ena  →  all blocks (board clock)</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>Fig 5.1</b> — Top-level block diagram. Amber = pin groups, slate = control, teal = arithmetic.</figcaption>
+    </figure>
+
+    <table class="tbl">
+      <tr><th>Block</th><th>Responsibility</th></tr>
+      <tr><td class="m">SPI Handler</td><td>Clocks bits in/out on <code>uio[3:0]</code>, deserializes 8&#8209;bit frames, checks the 3&#8209;bit (instruction) and 8&#8209;bit (data) CRC, and serializes the result back on MISO.</td></tr>
+      <tr><td class="m">I/O Handler</td><td>Runs the valid/ready handshake on <code>uio[7:4]</code>, latches operand bytes from <code>ui_in</code>, and drives result bytes onto <code>uo_out</code>.</td></tr>
+      <tr><td class="m">Register File</td><td>Holds operand A, operand B, and the accumulator (ACC) which doubles as the result register.</td></tr>
+      <tr><td class="m">Datapath</td><td>One shared add/subtract core plus the sequencer logic that turns it into multiply, divide, negate, abs, and compare; includes the float normalizer.</td></tr>
+      <tr><td class="m">Control Unit</td><td>The FSM (§13). Decodes the instruction frame, schedules operand fetches, drives the datapath cycle&#8209;by&#8209;cycle, and routes the result to the requested transport.</td></tr>
+    </table>
+  </section>
+
+  <!-- ============ 6. PINS ============ -->
+  <section id="s6">
+    <div class="secnum">SECTION 06</div>
+    <h2>Pin Interface</h2>
+    <p>FPU&#8209;130 uses every group of the standard Tiny Tapeout interface. The dedicated input byte carries burst operands; the dedicated output byte carries results; the bidirectional bus carries SPI on its low nibble and the four flow&#8209;control signals on its high nibble.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace" font-size="11">
+          <!-- chip -->
+          <rect x="250" y="90" width="260" height="250" rx="6" fill="#14181F"/>
+          <text x="380" y="210" text-anchor="middle" fill="#fff" font-size="15" font-weight="600" font-family="Space Grotesk, sans-serif">FPU&#8209;130</text>
+          <text x="380" y="232" text-anchor="middle" fill="#94A3B8" font-size="11">tt_um_fpu130</text>
+
+          <!-- TOP: uio[7:0] -->
+          <text x="380" y="30" text-anchor="middle" fill="#C2410C" font-size="12" font-weight="600">uio[7:0] — SPI + flow control (bidirectional)</text>
+          <g fill="#9A3412">
+            <text x="270" y="60">7 out_rdy</text>
+            <text x="270" y="74" fill="#C2410C">in</text>
+          </g>
+          <!-- top pin ticks -->
+          <g stroke="#C2410C" stroke-width="2">
+            <line x1="282" y1="80" x2="282" y2="90"/><line x1="314" y1="80" x2="314" y2="90"/>
+            <line x1="346" y1="80" x2="346" y2="90"/><line x1="378" y1="80" x2="378" y2="90"/>
+            <line x1="410" y1="80" x2="410" y2="90"/><line x1="442" y1="80" x2="442" y2="90"/>
+            <line x1="474" y1="80" x2="474" y2="90"/><line x1="506" y1="80" x2="506" y2="90" transform="translate(-8,0)"/>
+          </g>
+          <g fill="#9A3412" text-anchor="middle" font-size="9">
+            <text x="282" y="78">7</text><text x="314" y="78">6</text><text x="346" y="78">5</text><text x="378" y="78">4</text>
+            <text x="410" y="78">3</text><text x="442" y="78">2</text><text x="474" y="78">1</text><text x="498" y="78">0</text>
+          </g>
+
+          <!-- LEFT: ui_in -->
+          <text x="120" y="120" text-anchor="middle" fill="#334155" font-size="12" font-weight="600">ui_in[7:0]</text>
+          <text x="120" y="136" text-anchor="middle" fill="#64748B" font-size="10">byte in (burst operands)</text>
+          <g stroke="#334155" stroke-width="2">
+            <line x1="240" y1="170" x2="250" y2="170"/><line x1="240" y1="190" x2="250" y2="190"/>
+            <line x1="240" y1="210" x2="250" y2="210"/><line x1="240" y1="230" x2="250" y2="230"/>
+          </g>
+          <text x="225" y="200" text-anchor="end" fill="#475569" font-size="10">in</text>
+
+          <!-- RIGHT: uo_out -->
+          <text x="640" y="120" text-anchor="middle" fill="#334155" font-size="12" font-weight="600">uo_out[7:0]</text>
+          <text x="640" y="136" text-anchor="middle" fill="#64748B" font-size="10">byte out (results)</text>
+          <g stroke="#334155" stroke-width="2">
+            <line x1="510" y1="170" x2="520" y2="170"/><line x1="510" y1="190" x2="520" y2="190"/>
+            <line x1="510" y1="210" x2="520" y2="210"/><line x1="510" y1="230" x2="520" y2="230"/>
+          </g>
+          <text x="535" y="200" text-anchor="start" fill="#475569" font-size="10">out</text>
+
+          <!-- BOTTOM: clk/rst/ena -->
+          <g stroke="#64748B" stroke-width="2">
+            <line x1="330" y1="340" x2="330" y2="350"/><line x1="380" y1="340" x2="380" y2="350"/><line x1="430" y1="340" x2="430" y2="350"/>
+          </g>
+          <text x="380" y="372" text-anchor="middle" fill="#64748B" font-size="11">clk · rst_n · ena</text>
+          <text x="380" y="388" text-anchor="middle" fill="#94A3B8" font-size="10">board clock + housekeeping</text>
+        </svg>
+      </div>
+      <figcaption><b>Fig 6.1</b> — Pad assignment. Low nibble of <b>uio</b> = SPI, high nibble = handshake.</figcaption>
+    </figure>
+
+    <h3>6.1 Complete pin map</h3>
+    <table class="tbl">
+      <tr><th>Pin</th><th class="m">Dir</th><th>Signal</th><th>Function</th></tr>
+      <tr class="grp"><td colspan="4">uio[7:0] — bidirectional, uio_oe = 0x64</td></tr>
+      <tr><td class="m">uio[0]</td><td class="m">in</td><td class="m">spi_cs_n</td><td>SPI chip select, active low.</td></tr>
+      <tr><td class="m">uio[1]</td><td class="m">in</td><td class="m">spi_mosi</td><td>SPI host→FPU data (command &amp; operands).</td></tr>
+      <tr><td class="m">uio[2]</td><td class="m">out</td><td class="m">spi_miso</td><td>SPI FPU→host data (result read&#8209;back).</td></tr>
+      <tr><td class="m">uio[3]</td><td class="m">in</td><td class="m">spi_sck</td><td>SPI clock, Mode 0.</td></tr>
+      <tr><td class="m">uio[4]</td><td class="m">in</td><td class="m">in_valid</td><td>Host asserts: input byte on <code>ui_in</code> is valid.</td></tr>
+      <tr><td class="m">uio[5]</td><td class="m">out</td><td class="m">in_ready</td><td>FPU asserts: ready to accept an input byte.</td></tr>
+      <tr><td class="m">uio[6]</td><td class="m">out</td><td class="m">out_valid</td><td>FPU asserts: result byte on <code>uo_out</code> is valid.</td></tr>
+      <tr><td class="m">uio[7]</td><td class="m">in</td><td class="m">out_ready</td><td>Host asserts: ready to accept a result byte.</td></tr>
+      <tr class="grp"><td colspan="4">Dedicated buses</td></tr>
+      <tr><td class="m">ui_in[7:0]</td><td class="m">in</td><td class="m">byte_in</td><td>Parallel operand byte (burst mode).</td></tr>
+      <tr><td class="m">uo_out[7:0]</td><td class="m">out</td><td class="m">byte_out</td><td>Parallel result byte.</td></tr>
+      <tr class="grp"><td colspan="4">Housekeeping (provided by Tiny Tapeout)</td></tr>
+      <tr><td class="m">clk</td><td class="m">in</td><td class="m">clk</td><td>Synchronous board clock; clocks the whole core.</td></tr>
+      <tr><td class="m">rst_n</td><td class="m">in</td><td class="m">rst_n</td><td>Active&#8209;low synchronous reset.</td></tr>
+      <tr><td class="m">ena</td><td class="m">in</td><td class="m">ena</td><td>Tile enable; high when this design is selected.</td></tr>
+    </table>
+
+    <div class="note fix">
+      <span class="tag">Correction — C2 · MISO restored</span>
+      Rev 0.1 lists the four SPI pins as "Spi_clk, Spi_cs, Spi_mosi, Spi_mosi" — <code>Spi_mosi</code> appears twice. The fourth pin is the FPU&#8209;to&#8209;host line, <code>spi_miso</code>. Corrected above.
+    </div>
+    <div class="note open">
+      <span class="tag">Open Issue — MISO idle behavior</span>
+      Because <code>uio_oe</code> is a constant, MISO is always an output even when <code>spi_cs_n</code> is high. It will drive <code>0</code> while deselected. If you want true tri&#8209;state on a shared SPI bus, MISO's <code>uio_oe</code> bit must be driven dynamically from <code>~spi_cs_n</code> — a small change, but it makes the OE mask non&#8209;constant. Confirm which you want.
+    </div>
+  </section>
+
+  <!-- ============ 7. SPI ============ -->
+  <section id="s7">
+    <div class="secnum">SECTION 07</div>
+    <h2>SPI Interface</h2>
+    <p>FPU&#8209;130 is an SPI <em>peripheral</em> (slave). The host owns <code>spi_sck</code> and <code>spi_cs_n</code>. The link runs in <strong>Mode 0</strong>: clock idles low (CPOL=0) and data is sampled on the rising (leading) edge (CPHA=0). All frames are 8 bits, MSB&#8209;first.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace" font-size="11">
+          <!-- labels -->
+          <g fill="#334155" font-weight="600">
+            <text x="10" y="44">CS_n</text>
+            <text x="10" y="104">SCK</text>
+            <text x="10" y="164">MOSI</text>
+            <text x="10" y="224">MISO</text>
+          </g>
+          <!-- CS_n: high, drop, ... high -->
+          <polyline points="70,24 90,24 90,44 700,44 700,24 730,24" fill="none" stroke="#C2410C" stroke-width="2"/>
+          <text x="395" y="20" text-anchor="middle" fill="#9A3412" font-size="10">frame active (low)</text>
+
+          <!-- SCK: 8 pulses -->
+          <g stroke="#0E7490" stroke-width="2" fill="none">
+            <path d="M70,104 L110,104
+                     M110,104 L110,84 L150,84 L150,104 L190,104 L190,84 L230,84 L230,104
+                     L270,104 L270,84 L310,84 L310,104 L350,104 L350,84 L390,84 L390,104
+                     L430,104 L430,84 L470,84 L470,104 L510,104 L510,84 L550,84 L550,104
+                     L590,104 L590,84 L630,84 L630,104 L670,104 L670,84 L700,84 L700,104 L730,104"/>
+          </g>
+          <!-- sample edges (rising) -->
+          <g stroke="#B91C1C" stroke-width="1" stroke-dasharray="3 3">
+            <line x1="110" y1="80" x2="110" y2="200"/><line x1="190" y1="80" x2="190" y2="200"/>
+            <line x1="270" y1="80" x2="270" y2="200"/><line x1="350" y1="80" x2="350" y2="200"/>
+            <line x1="430" y1="80" x2="430" y2="200"/><line x1="510" y1="80" x2="510" y2="200"/>
+            <line x1="590" y1="80" x2="590" y2="200"/><line x1="670" y1="80" x2="670" y2="200"/>
+          </g>
+          <text x="110" y="74" fill="#B91C1C" font-size="9" text-anchor="middle">sample ↑</text>
+
+          <!-- MOSI bytes -->
+          <g stroke="#334155" stroke-width="2" fill="none">
+            <path d="M70,164 L90,164"/>
+          </g>
+          <g font-size="10" fill="#334155" text-anchor="middle">
+            <rect x="90" y="148" width="80" height="28" fill="#E4E8EE" stroke="#94A3B8"/><text x="130" y="167">b7</text>
+            <rect x="170" y="148" width="80" height="28" fill="#fff" stroke="#94A3B8"/><text x="210" y="167">b6</text>
+            <rect x="250" y="148" width="80" height="28" fill="#E4E8EE" stroke="#94A3B8"/><text x="290" y="167">b5</text>
+            <rect x="330" y="148" width="80" height="28" fill="#fff" stroke="#94A3B8"/><text x="370" y="167">b4</text>
+            <rect x="410" y="148" width="80" height="28" fill="#E4E8EE" stroke="#94A3B8"/><text x="450" y="167">b3</text>
+            <rect x="490" y="148" width="80" height="28" fill="#fff" stroke="#94A3B8"/><text x="530" y="167">b2</text>
+            <rect x="570" y="148" width="80" height="28" fill="#E4E8EE" stroke="#94A3B8"/><text x="610" y="167">b1</text>
+            <rect x="650" y="148" width="50" height="28" fill="#fff" stroke="#94A3B8"/><text x="675" y="167">b0</text>
+          </g>
+          <!-- MISO -->
+          <g font-size="10" fill="#0E7490" text-anchor="middle">
+            <rect x="90" y="208" width="610" height="28" fill="#CFF0F4" stroke="#0E7490"/>
+            <text x="395" y="227" font-size="10" fill="#0B5A70">result byte shifted out on same clocks (read-back)</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>Fig 7.1</b> — SPI Mode 0, one 8-bit frame. MOSI sampled on each rising SCK edge, MSB first.</figcaption>
+    </figure>
+
+    <h3>7.1 Frame structure</h3>
+    <p>A transaction begins when the host pulls <code>spi_cs_n</code> low and clocks an <strong>instruction byte</strong> (its own CRC&#8209;3 is validated first, which fixes how many bytes follow). When operand data travels over SPI (burst = 0), a <strong>control byte</strong> and the operand bytes follow, all covered by a <em>single</em> trailing CRC&#8209;8. Each bf16 operand is two bytes (high byte first).</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace" font-size="12">
+          <text x="20" y="28" fill="#334155" font-weight="600" font-size="13" font-family="Space Grotesk, sans-serif">Instruction byte — 8 bits (CRC-3 validated first)</text>
+          <g>
+            <rect x="20" y="40" width="90" height="52" fill="#FBE6D8" stroke="#C2410C" stroke-width="1.5"/>
+            <text x="65" y="63" text-anchor="middle" fill="#9A3412" font-size="11">burst</text>
+            <text x="65" y="79" text-anchor="middle" fill="#9A3412" font-size="10">[7]</text>
+            <rect x="110" y="40" width="90" height="52" fill="#FBE6D8" stroke="#C2410C" stroke-width="1.5"/>
+            <text x="155" y="63" text-anchor="middle" fill="#9A3412" font-size="11">acc</text>
+            <text x="155" y="79" text-anchor="middle" fill="#9A3412" font-size="10">[6]</text>
+            <rect x="200" y="40" width="230" height="52" fill="#E4E8EE" stroke="#334155" stroke-width="1.5"/>
+            <text x="315" y="63" text-anchor="middle" fill="#334155" font-size="11">opcode</text>
+            <text x="315" y="79" text-anchor="middle" fill="#334155" font-size="10">[5:3]</text>
+            <rect x="430" y="40" width="230" height="52" fill="#CFF0F4" stroke="#0E7490" stroke-width="1.5"/>
+            <text x="545" y="63" text-anchor="middle" fill="#0B5A70" font-size="11">CRC-3</text>
+            <text x="545" y="79" text-anchor="middle" fill="#0B5A70" font-size="10">[2:0]</text>
+          </g>
+
+          <text x="20" y="132" fill="#334155" font-weight="600" font-size="13" font-family="Space Grotesk, sans-serif">CRC-protected payload — length set by opcode &amp; acc</text>
+          <g>
+            <rect x="20" y="146" width="120" height="44" fill="#E4E8EE" stroke="#334155" stroke-width="1.5"/>
+            <text x="80" y="168" text-anchor="middle" fill="#334155">control</text>
+            <text x="80" y="182" text-anchor="middle" fill="#64748B" font-size="10">1 byte</text>
+
+            <rect x="140" y="146" width="100" height="44" fill="#FBE6D8" stroke="#C2410C" stroke-width="1.5"/>
+            <text x="190" y="168" text-anchor="middle" fill="#9A3412">op1 hi</text>
+            <rect x="240" y="146" width="100" height="44" fill="#FBE6D8" stroke="#C2410C" stroke-width="1.5"/>
+            <text x="290" y="168" text-anchor="middle" fill="#9A3412">op1 lo</text>
+            <rect x="340" y="146" width="100" height="44" fill="#FDEFE2" stroke="#C2410C" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <text x="390" y="166" text-anchor="middle" fill="#9A3412">op2 hi</text>
+            <text x="390" y="180" text-anchor="middle" fill="#C2410C" font-size="9">binary only</text>
+            <rect x="440" y="146" width="100" height="44" fill="#FDEFE2" stroke="#C2410C" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <text x="490" y="166" text-anchor="middle" fill="#9A3412">op2 lo</text>
+            <text x="490" y="180" text-anchor="middle" fill="#C2410C" font-size="9">binary only</text>
+
+            <rect x="560" y="146" width="120" height="44" fill="#CFF0F4" stroke="#0E7490" stroke-width="1.5"/>
+            <text x="620" y="168" text-anchor="middle" fill="#0B5A70">CRC-8</text>
+            <text x="620" y="182" text-anchor="middle" fill="#0B5A70" font-size="10">over payload</text>
+          </g>
+          <path d="M20,200 L20,210 L540,210 L540,200" fill="none" stroke="#0E7490" stroke-width="1.2"/>
+          <text x="280" y="226" text-anchor="middle" fill="#0B5A70" font-size="11">single CRC-8 covers control + all operand bytes</text>
+
+          <text x="20" y="262" fill="#64748B" font-size="11">payload bytes = 1 (control) + (arity − acc) × 2.  Unary op (NEG/ABS): control + op1(2) + CRC.</text>
+          <text x="20" y="280" fill="#64748B" font-size="11">acc = 1: op1 is taken from ACC, so only op2 is sent.  NOP: control + CRC, no operands.</text>
+        </svg>
+      </div>
+      <figcaption><b>Fig 7.2</b> — SPI frame. Instruction byte (own CRC-3), then a <b>control byte</b> + bf16 operands under a <b>single CRC-8</b>.</figcaption>
+    </figure>
+
+    <h3>7.2 Reading the result over SPI</h3>
+    <p>SPI is full&#8209;duplex at the wire level: every byte the host clocks out on MOSI simultaneously clocks a byte in on MISO. While the FPU is busy it returns the <strong>status byte</strong> (§11) with <code>BUSY=1</code>, so the host polls; once <code>BUSY</code> clears, a read returns the two result bytes (high byte first). Each transaction's status byte echoes the control byte's <code>TAG</code> field for request/response correlation.</p>
+
+    <h3>7.3 Clocking &amp; oversampling</h3>
+    <p>The core clocks at <strong>40 MHz</strong>; SPI SCK runs at <strong>10 MHz</strong>. FPU&#8209;130 is an oversampled SPI peripheral: SCK is never used as a clock. The SPI inputs (<code>spi_sck</code>, <code>spi_cs_n</code>, <code>spi_mosi</code>) pass through 2&#8209;flop synchronizers into the core domain; a one&#8209;cycle edge&#8209;detect pulse off the synchronized SCK enables MOSI sampling (rising edge) and MISO update (falling edge).</p>
+
+    <table class="tbl">
+      <tr><th>Parameter</th><th class="m">Value</th><th>Notes</th></tr>
+      <tr><td>Core clock</td><td class="m">40 MHz (25 ns)</td><td>clocks the entire design</td></tr>
+      <tr><td>SCK</td><td class="m">10 MHz (100 ns)</td><td>host-driven; sampled, not used as a clock</td></tr>
+      <tr><td>Oversampling ratio</td><td class="m">4×</td><td>minimum safe ratio; 2 core clocks per SCK phase</td></tr>
+      <tr><td>Max SCK</td><td class="m">board ÷ 4 = 10 MHz</td><td>at the ceiling — no headroom without a faster core</td></tr>
+      <tr><td>Input sync latency</td><td class="m">2 core clocks (+1 edge-detect)</td><td>consistent, so MOSI sampling stays aligned</td></tr>
+    </table>
+    <div class="note open">
+      <span class="tag">Open Issue — oversampling margin</span>
+      4× gives exactly two core clocks per SCK phase — workable, but SCK <em>duty&#8209;cycle distortion or jitter</em> eats directly into that budget. The RP2040 divides a clean internal clock so its duty is normally tight; if a noisy SCK is a concern, either hold SCK at 8 MHz (5×) or raise the core toward 48–50 MHz if timing closes.
+    </div>
+  </section>
+
+  <!-- ============ 8. PARALLEL ============ -->
+  <section id="s8">
+    <div class="secnum">SECTION 08</div>
+    <h2>Parallel Full-Duplex Port</h2>
+    <p>For streaming workloads, operands can be pushed in over the dedicated 8&#8209;bit input bus and results pulled out over the dedicated 8&#8209;bit output bus, each governed by an independent <strong>valid/ready</strong> handshake. This is the "burst" path (instruction bit 7 = 1). It is faster than SPI because a whole byte moves per clock instead of one bit per SCK edge.</p>
+
+    <h3>8.1 Handshake rule</h3>
+    <p>A byte transfers on the rising board&#8209;clock edge where <em>both</em> <code>valid</code> and <code>ready</code> are high. Either side may assert its signal first; neither waits on the other to <em>begin</em> asserting. This is the standard AXI&#8209;Stream&#8209;style contract and is deadlock&#8209;free as long as <code>valid</code> never waits for <code>ready</code>.</p>
+
+    <div class="note fix">
+      <span class="tag">Correction — C3 · handshake wording</span>
+      Rev 0.1 step 2 reads "Valid asserts ready," which is garbled. The intended rule is: <em>the sender asserts <code>valid</code></em> while <em>the receiver asserts <code>ready</code></em>; the transfer happens on the cycle both are high. Steps corrected below.
+    </div>
+
+    <ol>
+      <li>Receiver raises <code>ready</code> when it can accept a byte.</li>
+      <li>Sender raises <code>valid</code> and drives the byte onto the bus. (Steps 1–2 may occur in either order.)</li>
+      <li>On the first clock edge with <code>valid &amp; ready</code> both high, the byte is transferred.</li>
+      <li>Each side deasserts its signal (or keeps it high to stream the next byte back&#8209;to&#8209;back).</li>
+    </ol>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace" font-size="11">
+          <g fill="#334155" font-weight="600">
+            <text x="10" y="38">clk</text>
+            <text x="10" y="98">valid</text>
+            <text x="10" y="158">ready</text>
+            <text x="10" y="218">data</text>
+          </g>
+          <!-- clk -->
+          <g stroke="#64748B" stroke-width="1.6" fill="none">
+            <path d="M70,38 L90,38 L90,18 L130,18 L130,38 L170,38 L170,18 L210,18 L210,38 L250,38 L250,18 L290,18 L290,38 L330,38 L330,18 L370,18 L370,38 L410,38 L410,18 L450,18 L450,38 L490,38 L490,18 L530,18 L530,38 L570,38 L570,18 L610,18 L610,38 L650,38 L650,18 L690,18 L690,38 L720,38"/>
+          </g>
+          <!-- edge guides -->
+          <g stroke="#CBD5E1" stroke-width="1" stroke-dasharray="2 3">
+            <line x1="290" y1="10" x2="290" y2="230"/>
+            <line x1="450" y1="10" x2="450" y2="230"/>
+          </g>
+          <!-- valid -->
+          <polyline points="70,98 170,98 170,78 410,78 410,98 720,98" fill="none" stroke="#C2410C" stroke-width="2"/>
+          <!-- ready -->
+          <polyline points="70,158 250,158 250,138 530,138 530,158 720,158" fill="none" stroke="#0E7490" stroke-width="2"/>
+          <!-- transfer markers -->
+          <circle cx="290" cy="78" r="4" fill="#B91C1C"/><text x="290" y="68" text-anchor="middle" fill="#B91C1C" font-size="9">xfer A</text>
+          <circle cx="290" cy="138" r="4" fill="#B91C1C"/>
+          <circle cx="410" cy="138" r="4" fill="#B91C1C"/><text x="410" y="128" text-anchor="middle" fill="#B91C1C" font-size="9">xfer B</text>
+          <!-- data -->
+          <g font-size="10" fill="#334155" text-anchor="middle">
+            <rect x="170" y="202" width="120" height="28" fill="#E4E8EE" stroke="#94A3B8"/><text x="230" y="221">byte A</text>
+            <rect x="290" y="202" width="120" height="28" fill="#FBE6D8" stroke="#C2410C"/><text x="350" y="221">byte B</text>
+            <rect x="410" y="202" width="120" height="28" fill="#E4E8EE" stroke="#94A3B8"/><text x="470" y="221">—</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>Fig 8.1</b> — valid/ready handshake. Transfer occurs only where both are high at a clock edge.</figcaption>
+    </figure>
+
+    <h3>8.2 Burst frame</h3>
+    <p>A burst carries the same CRC&#8209;protected payload as SPI, just moved over the parallel port one byte per handshake: <code>control</code>, then each bf16 operand as two bytes (<strong>high byte first</strong>), then the single CRC&#8209;8 over the whole payload. Each operand therefore takes two <code>in_valid</code>/<code>in_ready</code> transfers. Results stream back over <code>uo_out</code> as two bytes (high first) with the FPU as sender (<code>out_valid</code>) and the host as receiver (<code>out_ready</code>); the status byte is available on the same path. The instruction byte and its CRC&#8209;3 are always delivered over SPI first — burst only relocates the operand <em>data</em>.</p>
+  </section>
+
+  <!-- ============ 9. ISA ============ -->
+  <section id="s9">
+    <div class="secnum">SECTION 09</div>
+    <h2>Instruction Set</h2>
+    <p>The 3&#8209;bit opcode selects one of eight operations, completed with exact semantics, operand count, and result for the bfloat16 format of §4. Operands are <code>a = op1</code> (or ACC in accumulate mode) and <code>b = op2</code>; rounding follows the <code>RND</code> field of the control byte (§11).</p>
+
+    <table class="tbl">
+      <tr><th class="m">Opcode</th><th>Mnemonic</th><th class="m">Operands</th><th>Result</th><th>Notes</th></tr>
+      <tr><td class="m">000</td><td class="tag-op">ADD</td><td class="m">a, b</td><td class="m">a + b</td><td>float add; align exponents, add, normalize, round&#8209;to&#8209;nearest&#8209;even.</td></tr>
+      <tr><td class="m">001</td><td class="tag-op">SUB</td><td class="m">a, b</td><td class="m">a − b</td><td>add with b's sign flipped.</td></tr>
+      <tr><td class="m">010</td><td class="tag-op">MUL</td><td class="m">a, b</td><td class="m">a × b</td><td>add exponents, multiply significands (4×4), normalize.</td></tr>
+      <tr><td class="m">011</td><td class="tag-op">DIV</td><td class="m">a, b</td><td class="m">a ÷ b</td><td>subtract exponents, iterative significand divide; b=0 → NaN.</td></tr>
+      <tr><td class="m">100</td><td class="tag-op">NEG</td><td class="m">a</td><td class="m">−a</td><td>unary; flip sign bit only.</td></tr>
+      <tr><td class="m">101</td><td class="tag-op">ABS</td><td class="m">a</td><td class="m">|a|</td><td>unary; clear sign bit.</td></tr>
+      <tr><td class="m">110</td><td class="tag-op">SLT</td><td class="m">a, b</td><td class="m">(a &lt; b) ? 1.0 : 0.0</td><td>set&#8209;less&#8209;than; returns a float 1.0 or 0.0 flag.</td></tr>
+      <tr><td class="m">111</td><td class="tag-op">NOP</td><td class="m">—</td><td class="m">ACC unchanged</td><td>no operands, no write; used for status read&#8209;back / padding.</td></tr>
+    </table>
+
+    <div class="note decision">
+      <span class="tag">Design Decision — SLT result encoding</span>
+      <code>SLT</code> returns bfloat16 <code>1.0</code> (<code>0x3F80</code>) for true and <code>+0.0</code> (<code>0x0000</code>) for false, so the flag can feed straight back into arithmetic in accumulate mode.
+    </div>
+
+    <h3>9.1 Control byte (host → FPU) &amp; status byte (FPU → host)</h3>
+    <p>Each transaction carries a host&#8209;supplied <strong>control byte</strong> as the first byte of the CRC&#8209;protected payload (§7.1), and the FPU returns a <strong>status byte</strong> on read&#8209;back. The two are symmetric and share a 2&#8209;bit <code>TAG</code> that the FPU echoes, letting the host match each result to its request in a pipelined or burst stream.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 660 200" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace">
+          <text x="72" y="20" font-size="13" font-weight="600" fill="#334155" font-family="Space Grotesk, sans-serif">Control byte (host → FPU)</text>
+          <g font-size="11" fill="#64748B" text-anchor="middle">
+            <text x="140" y="34">7:6</text><text x="245" y="34">5</text><text x="315" y="34">4</text><text x="385" y="34">3</text><text x="455" y="34">2</text><text x="560" y="34">1:0</text>
+          </g>
+          <rect x="72" y="40" width="136" height="40" rx="3" fill="#FBE6D8" stroke="#C2410C" stroke-width="1"/><text x="140" y="64" text-anchor="middle" font-weight="600" fill="#9A3412">TAG</text>
+          <rect x="212" y="40" width="66" height="40" rx="3" fill="#F1F5F9" stroke="#94A3B8" stroke-width="0.5"/><text x="245" y="64" text-anchor="middle" font-size="11" fill="#64748B">rsv</text>
+          <rect x="282" y="40" width="66" height="40" fill="#E4E8EE" stroke="#334155" stroke-width="0.5"/><text x="315" y="64" text-anchor="middle" font-size="11" fill="#334155">SAT</text>
+          <rect x="352" y="40" width="66" height="40" fill="#E4E8EE" stroke="#334155" stroke-width="0.5"/><text x="385" y="64" text-anchor="middle" font-size="11" fill="#334155">CLRF</text>
+          <rect x="422" y="40" width="66" height="40" fill="#E4E8EE" stroke="#334155" stroke-width="0.5"/><text x="455" y="64" text-anchor="middle" font-size="11" fill="#334155">CLRA</text>
+          <rect x="492" y="40" width="136" height="40" rx="3" fill="#CFF0F4" stroke="#0E7490" stroke-width="1"/><text x="560" y="64" text-anchor="middle" font-weight="600" fill="#0B5A70">RND</text>
+
+          <text x="72" y="110" font-size="13" font-weight="600" fill="#334155" font-family="Space Grotesk, sans-serif">Status byte (FPU → host)</text>
+          <g font-size="11" fill="#64748B" text-anchor="middle">
+            <text x="140" y="124">7:6</text><text x="245" y="124">5</text><text x="315" y="124">4</text><text x="385" y="124">3</text><text x="455" y="124">2</text><text x="525" y="124">1</text><text x="595" y="124">0</text>
+          </g>
+          <rect x="72" y="130" width="136" height="40" rx="3" fill="#FBE6D8" stroke="#C2410C" stroke-width="1"/><text x="140" y="154" text-anchor="middle" font-weight="600" fill="#9A3412">TAG echo</text>
+          <rect x="212" y="130" width="66" height="40" fill="#E4E8EE" stroke="#334155" stroke-width="0.5"/><text x="245" y="154" text-anchor="middle" font-size="11" fill="#334155">ERR</text>
+          <rect x="282" y="130" width="66" height="40" fill="#E4E8EE" stroke="#334155" stroke-width="0.5"/><text x="315" y="154" text-anchor="middle" font-size="11" fill="#334155">INX</text>
+          <rect x="352" y="130" width="66" height="40" fill="#E4E8EE" stroke="#334155" stroke-width="0.5"/><text x="385" y="154" text-anchor="middle" font-size="11" fill="#334155">UNF</text>
+          <rect x="422" y="130" width="66" height="40" fill="#E4E8EE" stroke="#334155" stroke-width="0.5"/><text x="455" y="154" text-anchor="middle" font-size="11" fill="#334155">OVF</text>
+          <rect x="492" y="130" width="66" height="40" fill="#E4E8EE" stroke="#334155" stroke-width="0.5"/><text x="525" y="154" text-anchor="middle" font-size="11" fill="#334155">NAN</text>
+          <rect x="562" y="130" width="66" height="40" rx="3" fill="#CFF0F4" stroke="#0E7490" stroke-width="1"/><text x="595" y="154" text-anchor="middle" font-weight="600" fill="#0B5A70">BUSY</text>
+        </svg>
+      </div>
+      <figcaption><b>Fig 9.1</b> — Control byte (in) and status byte (out). <b>TAG</b> is echoed for request/response correlation.</figcaption>
+    </figure>
+
+    <table class="tbl">
+      <tr><th class="m">Field</th><th>Dir</th><th>Meaning</th></tr>
+      <tr><td class="m">RND[1:0]</td><td>in</td><td>Rounding mode: 00 = round&#8209;nearest&#8209;even, 01 = toward zero, 10 = toward +∞, 11 = toward −∞.</td></tr>
+      <tr><td class="m">CLRA</td><td>in</td><td>Clear ACC to +0.0 before this op (start a fresh accumulate chain).</td></tr>
+      <tr><td class="m">CLRF</td><td>in</td><td>Clear sticky exception flags before this op.</td></tr>
+      <tr><td class="m">SAT</td><td>in</td><td>On overflow, saturate to max&#8209;finite instead of producing ±Inf.</td></tr>
+      <tr><td class="m">TAG[1:0]</td><td>in/out</td><td>Host&#8209;chosen transaction tag; echoed in the status byte.</td></tr>
+      <tr><td class="m">BUSY</td><td>out</td><td>Computation in progress; result not yet valid.</td></tr>
+      <tr><td class="m">NAN / OVF / UNF</td><td>out</td><td>Result is NaN / overflowed / underflowed.</td></tr>
+      <tr><td class="m">INX</td><td>out</td><td>Inexact — rounding occurred (sticky until CLRF).</td></tr>
+      <tr><td class="m">ERR</td><td>out</td><td>Last CRC check failed; the frame was dropped.</td></tr>
+    </table>
+
+    <div class="note decision">
+      <span class="tag">Design Decision — D7 (restated)</span>
+      Exact bit assignments above are the proposal; reorder freely. The control byte is always present (even for <code>NOP</code>, where <code>NOP + CLRA</code> or <code>NOP + CLRF</code> becomes a useful control&#8209;only operation, and a bare <code>NOP</code> is a status read).
+    </div>
+  </section>
+
+  <!-- ============ 10. MODES ============ -->
+  <section id="s10">
+    <div class="secnum">SECTION 10</div>
+    <h2>Control Modes</h2>
+    <p>The two mode bits in the instruction frame are orthogonal and can be combined freely.</p>
+
+    <h3>10.1 Burst (instruction bit 7)</h3>
+    <p><strong>burst = 0:</strong> operands and result travel over SPI (data frames on MOSI, read&#8209;back on MISO). <strong>burst = 1:</strong> operands arrive over the parallel <code>ui_in</code> port and the result leaves over <code>uo_out</code>, each under valid/ready flow control (§8). The instruction frame itself is always delivered over SPI regardless of burst — burst only changes where the <em>operand data</em> flows.</p>
+
+    <h3>10.2 Accumulate (instruction bit 6)</h3>
+    <p><strong>acc = 0:</strong> both operands come from the incoming frames. <strong>acc = 1:</strong> the first operand is taken from the ACC register (the previous result), and only <code>op2</code> is supplied. This lets the host chain operations — e.g. a running sum — without re&#8209;transmitting the accumulator each time.</p>
+
+    <table class="tbl">
+      <tr><th class="m">burst</th><th class="m">acc</th><th>Operand source</th><th>Result destination</th></tr>
+      <tr><td class="m">0</td><td class="m">0</td><td>op1 &amp; op2 over SPI</td><td>SPI MISO read&#8209;back</td></tr>
+      <tr><td class="m">0</td><td class="m">1</td><td>op1 = ACC; op2 over SPI</td><td>SPI MISO read&#8209;back</td></tr>
+      <tr><td class="m">1</td><td class="m">0</td><td>op1 &amp; op2 over <code>ui_in</code></td><td><code>uo_out</code> stream</td></tr>
+      <tr><td class="m">1</td><td class="m">1</td><td>op1 = ACC; op2 over <code>ui_in</code></td><td><code>uo_out</code> stream</td></tr>
+    </table>
+
+    <div class="note fix">
+      <span class="tag">Correction — C4 · mode definitions made explicit</span>
+      Rev 0.1 defined burst and accumulate in one&#8209;line footnotes only. The table above makes the four combinations and their data routing unambiguous.
+    </div>
+  </section>
+
+  <!-- ============ 11. CRC ============ -->
+  <section id="s11">
+    <div class="secnum">SECTION 11</div>
+    <h2>CRC Definition</h2>
+    <p>FPU&#8209;130 uses two layered CRC scopes, both computed MSB&#8209;first with a small LFSR. The instruction byte is protected on its own and validated <em>first</em> — that is what tells the receiver the payload length, so a single CRC over the rest is unambiguously placed.</p>
+
+    <table class="tbl">
+      <tr><th>Field</th><th>Covers</th><th class="m">Standard</th><th class="m">Poly</th><th class="m">Init</th></tr>
+      <tr><td>Instruction CRC&#8209;3</td><td>burst·acc·opcode (5 bits)</td><td class="m">CRC&#8209;3/GSM</td><td class="m">0x3</td><td class="m">0x0</td></tr>
+      <tr><td>Payload CRC&#8209;8</td><td>control byte + all operand bytes</td><td class="m">CRC&#8209;8/SMBUS</td><td class="m">0x07</td><td class="m">0x00</td></tr>
+    </table>
+
+    <p>The payload CRC&#8209;8 spans the control byte plus <code>(arity − acc) × 2</code> operand bytes — for a binary op that is the control byte and four operand bytes under one CRC, versus the two separate CRCs an earlier draft would have used. The LFSR is reset at the start of the payload, clocked through every payload byte, and checked once against the trailing byte. By CRC linearity an 8&#8209;bit CRC over the whole block keeps the same ~1/256 random false&#8209;accept and still catches errors that straddle the op1/op2 boundary; the only thing given up is per&#8209;operand fault localization, which costs nothing because recovery resends the whole frame anyway.</p>
+
+    <p>On any mismatch the FPU sets the <code>ERR</code> status bit and drops the frame rather than computing on corrupt data; the host re&#8209;sends. Both CRCs together are a few XOR gates and two short shift registers — negligible area for the integrity.</p>
+
+    <div class="note decision">
+      <span class="tag">Design Decision — D4 (restated)</span>
+      Keeping the instruction CRC&#8209;3 <em>separate and validated first</em> is load&#8209;bearing: the receiver must trust the arity before it can know where the payload CRC lands. Folding everything into one end&#8209;of&#8209;transaction CRC would mean mis&#8209;counting payload bytes off a corrupt opcode. CRC&#8209;3/GSM and CRC&#8209;8/SMBUS have published reference vectors; swap polynomials freely — the hardware cost is identical.
+    </div>
+  </section>
+
+  <!-- ============ 12. DATAPATH ============ -->
+  <section id="s12">
+    <div class="secnum">SECTION 12</div>
+    <h2>Datapath Micro-architecture</h2>
+    <p>This is the only section that depends on the number&#8209;format choice. The datapath is deliberately <em>narrow and reused</em>: one shared add/subtract core does the heavy lifting for every instruction, sequenced over several clocks by the control unit (Decision D2). For bfloat16 the core and the unpacked operands are <strong>8&#8209;bit significands</strong> (7 stored + the implicit 1) with an <strong>8&#8209;bit exponent</strong> path; <code>MUL</code> is a full 8×8 significand multiply and <code>DIV</code> an 8&#8209;bit iterative divide, both shift&#8209;sequenced through the one core.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 820 420" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+          <defs>
+            <marker id="ar2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L7,3 L0,6 Z" fill="#64748B"/>
+            </marker>
+          </defs>
+          <!-- registers -->
+          <rect x="30" y="40" width="120" height="50" rx="5" fill="#fff" stroke="#94A3B8" stroke-width="1.5"/>
+          <text x="90" y="62" text-anchor="middle" font-weight="600" fill="#334155">A reg</text>
+          <text x="90" y="79" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">op1 / ACC</text>
+
+          <rect x="30" y="120" width="120" height="50" rx="5" fill="#fff" stroke="#94A3B8" stroke-width="1.5"/>
+          <text x="90" y="142" text-anchor="middle" font-weight="600" fill="#334155">B reg</text>
+          <text x="90" y="159" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">op2</text>
+
+          <!-- unpack -->
+          <rect x="210" y="40" width="120" height="130" rx="5" fill="#F1F5F9" stroke="#334155" stroke-width="1.5"/>
+          <text x="270" y="98" text-anchor="middle" font-weight="600" fill="#334155">Unpack</text>
+          <text x="270" y="116" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">split S/E/M</text>
+          <text x="270" y="130" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">add implicit 1</text>
+
+          <!-- exponent unit -->
+          <rect x="390" y="30" width="150" height="70" rx="5" fill="#E4E8EE" stroke="#334155" stroke-width="1.5"/>
+          <text x="465" y="60" text-anchor="middle" font-weight="600" fill="#334155">Exponent unit</text>
+          <text x="465" y="78" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">±, align shift</text>
+
+          <!-- shared core -->
+          <rect x="390" y="120" width="150" height="90" rx="5" fill="#0E7490" stroke="#0B5A70" stroke-width="1.5"/>
+          <text x="465" y="158" text-anchor="middle" font-weight="600" fill="#fff">Shared add/sub</text>
+          <text x="465" y="176" text-anchor="middle" font-size="10" fill="#CFF0F4" font-family="IBM Plex Mono">significand core</text>
+          <text x="465" y="192" text-anchor="middle" font-size="10" fill="#CFF0F4" font-family="IBM Plex Mono">+ shift register</text>
+
+          <!-- sequencer -->
+          <rect x="390" y="230" width="150" height="70" rx="5" fill="#334155" stroke="#1E293B" stroke-width="1.5"/>
+          <text x="465" y="262" text-anchor="middle" font-weight="600" fill="#fff">Mul/Div seq</text>
+          <text x="465" y="280" text-anchor="middle" font-size="10" fill="#CBD5E1" font-family="IBM Plex Mono">shift-add / shift-sub</text>
+
+          <!-- normalize -->
+          <rect x="600" y="80" width="130" height="90" rx="5" fill="#CFF0F4" stroke="#0E7490" stroke-width="1.5"/>
+          <text x="665" y="118" text-anchor="middle" font-weight="600" fill="#0B5A70">Normalize</text>
+          <text x="665" y="136" text-anchor="middle" font-size="10" fill="#0B5A70" font-family="IBM Plex Mono">leading-1 detect</text>
+          <text x="665" y="150" text-anchor="middle" font-size="10" fill="#0B5A70" font-family="IBM Plex Mono">round (RNE)</text>
+
+          <!-- pack -->
+          <rect x="600" y="200" width="130" height="60" rx="5" fill="#F1F5F9" stroke="#334155" stroke-width="1.5"/>
+          <text x="665" y="226" text-anchor="middle" font-weight="600" fill="#334155">Pack</text>
+          <text x="665" y="244" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">S/E/M → byte</text>
+
+          <!-- result -->
+          <rect x="600" y="300" width="130" height="50" rx="5" fill="#fff" stroke="#94A3B8" stroke-width="1.5"/>
+          <text x="665" y="322" text-anchor="middle" font-weight="600" fill="#334155">ACC / result</text>
+          <text x="665" y="339" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">→ transports</text>
+
+          <!-- arrows -->
+          <g stroke="#64748B" stroke-width="1.5" fill="none" marker-end="url(#ar2)">
+            <path d="M150,65 L208,65"/>
+            <path d="M150,145 L180,145 L180,120 L208,120"/>
+            <path d="M330,75 L388,65"/>
+            <path d="M330,130 L388,160"/>
+            <path d="M540,65 L570,65 L570,110 L598,110"/>
+            <path d="M540,165 L570,165 L570,130 L598,130"/>
+            <path d="M465,210 L465,228"/>
+            <path d="M540,265 L575,265 L575,150 L598,150" />
+            <path d="M665,170 L665,198"/>
+            <path d="M665,260 L665,298"/>
+            <path d="M600,325 L90,325 L90,170" stroke-dasharray="4 3"/>
+          </g>
+          <text x="300" y="345" fill="#94A3B8" font-size="10" font-family="IBM Plex Mono">result feeds back to A reg (accumulate)</text>
+        </svg>
+      </div>
+      <figcaption><b>Fig 12.1</b> — Datapath. The single teal add/sub core is reused by the sequencer for MUL and DIV.</figcaption>
+    </figure>
+
+    <h3>12.1 How each op uses the core</h3>
+    <table class="tbl">
+      <tr><th>Op</th><th>Mechanism</th><th class="m">≈ cycles</th></tr>
+      <tr><td class="tag-op">ADD / SUB</td><td>Compare exponents, shift the smaller significand to align, add/subtract in the core, normalize, round.</td><td class="m">3–4</td></tr>
+      <tr><td class="tag-op">MUL</td><td>Add exponents (exponent unit); multiply 8&#8209;bit significands by shift&#8209;add through the core; normalize, round.</td><td class="m">6–8</td></tr>
+      <tr><td class="tag-op">DIV</td><td>Subtract exponents; non&#8209;restoring division of significands by shift&#8209;subtract through the core; normalize, round.</td><td class="m">6–10</td></tr>
+      <tr><td class="tag-op">NEG / ABS</td><td>Pure bit manipulation of the sign field; no core pass.</td><td class="m">1</td></tr>
+      <tr><td class="tag-op">SLT</td><td>Sign check, then compare exponent/mantissa magnitudes; emit 1.0 / 0.0.</td><td class="m">1–2</td></tr>
+    </table>
+    <p>Latency is variable, which is exactly why the FPU exposes a <strong>busy</strong> status: the host either polls the status byte or watches <code>out_valid</code>, rather than assuming a fixed delay.</p>
+  </section>
+
+  <!-- ============ 13. FSM ============ -->
+  <section id="s13">
+    <div class="secnum">SECTION 13</div>
+    <h2>Control Unit FSM</h2>
+    <p>The Rev 0.1 state diagram was a dense, partly&#8209;overlapping sketch. Redrawn as a single clean flow, the control unit is a straightforward request→decode→fetch→execute→writeback→return loop. The same FSM serves both transports; only the fetch and return states branch on the <code>burst</code> bit.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 860 440" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11.5">
+          <defs>
+            <marker id="ar3" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L7,3 L0,6 Z" fill="#64748B"/>
+            </marker>
+          </defs>
+          <!-- state node style via repeated rects -->
+          <!-- RESET -->
+          <rect x="30" y="30" width="120" height="46" rx="23" fill="#334155"/>
+          <text x="90" y="58" text-anchor="middle" fill="#fff" font-weight="600">RESET</text>
+          <!-- IDLE -->
+          <rect x="30" y="110" width="120" height="46" rx="23" fill="#C2410C"/>
+          <text x="90" y="132" text-anchor="middle" fill="#fff" font-weight="600">IDLE</text>
+          <text x="90" y="148" text-anchor="middle" fill="#FBE6D8" font-size="9">wait CS↓</text>
+          <!-- RX_INSTR -->
+          <rect x="220" y="110" width="130" height="46" rx="23" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+          <text x="285" y="132" text-anchor="middle" fill="#334155" font-weight="600">RX_INSTR</text>
+          <text x="285" y="148" text-anchor="middle" fill="#64748B" font-size="9">shift 8 · CRC3</text>
+          <!-- DECODE -->
+          <rect x="420" y="110" width="120" height="46" rx="23" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+          <text x="480" y="137" text-anchor="middle" fill="#334155" font-weight="600">DECODE</text>
+          <!-- FETCH OPS -->
+          <rect x="420" y="200" width="120" height="56" rx="14" fill="#fff" stroke="#C2410C" stroke-width="1.5"/>
+          <text x="480" y="222" text-anchor="middle" fill="#9A3412" font-weight="600">RX PAYLOAD</text>
+          <text x="480" y="237" text-anchor="middle" fill="#9A3412" font-size="9">control + operands</text>
+          <text x="480" y="249" text-anchor="middle" fill="#9A3412" font-size="9">SPI or burst · CRC-8</text>
+          <!-- EXEC -->
+          <rect x="420" y="300" width="120" height="56" rx="14" fill="#0E7490" stroke="#0B5A70" stroke-width="1.5"/>
+          <text x="480" y="324" text-anchor="middle" fill="#fff" font-weight="600">EXECUTE</text>
+          <text x="480" y="340" text-anchor="middle" fill="#CFF0F4" font-size="9">assert busy · N cycles</text>
+          <!-- WRITEBACK -->
+          <rect x="600" y="300" width="120" height="56" rx="14" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+          <text x="660" y="324" text-anchor="middle" fill="#334155" font-weight="600">WRITEBACK</text>
+          <text x="660" y="340" text-anchor="middle" fill="#64748B" font-size="9">store ACC</text>
+          <!-- RETURN -->
+          <rect x="600" y="200" width="120" height="56" rx="14" fill="#fff" stroke="#C2410C" stroke-width="1.5"/>
+          <text x="660" y="224" text-anchor="middle" fill="#9A3412" font-weight="600">RETURN</text>
+          <text x="660" y="240" text-anchor="middle" fill="#9A3412" font-size="9">MISO or out_valid</text>
+
+          <!-- arrows -->
+          <g stroke="#64748B" stroke-width="1.5" fill="none" marker-end="url(#ar3)">
+            <path d="M90,76 L90,108"/>
+            <path d="M150,133 L218,133"/>
+            <path d="M350,133 L418,133"/>
+            <path d="M480,156 L480,198"/>
+            <path d="M480,256 L480,298"/>
+            <path d="M540,328 L598,328"/>
+            <path d="M660,300 L660,258"/>
+            <path d="M600,228 L300,228 L300,156" />
+          </g>
+          <!-- DECODE shortcut for NOP/unary skip -->
+          <g stroke="#94A3B8" stroke-width="1.3" fill="none" stroke-dasharray="4 3" marker-end="url(#ar3)">
+            <path d="M540,128 L580,128 L580,300"/>
+          </g>
+          <text x="588" y="124" fill="#94A3B8" font-size="9">NOP / no op2</text>
+
+          <!-- RETURN back to IDLE -->
+          <g stroke="#64748B" stroke-width="1.5" fill="none" marker-end="url(#ar3)">
+            <path d="M600,210 L170,210 L130,210 L130,158" transform="translate(0,0)"/>
+          </g>
+          <text x="300" y="204" fill="#94A3B8" font-size="9">done → IDLE</text>
+
+          <!-- CRC fail loops -->
+          <text x="285" y="178" fill="#B91C1C" font-size="9" text-anchor="middle">CRC fail → err, back to IDLE</text>
+        </svg>
+      </div>
+      <figcaption><b>Fig 13.1</b> — Control FSM. Amber = transport-dependent states, teal = compute, slate = bookkeeping.</figcaption>
+    </figure>
+
+    <table class="tbl">
+      <tr><th>State</th><th>Action</th><th>Exit condition</th></tr>
+      <tr><td class="m">RESET</td><td>Clear ACC, registers, status; deassert all outputs.</td><td>rst_n high → IDLE</td></tr>
+      <tr><td class="m">IDLE</td><td>Wait for <code>spi_cs_n</code> to fall.</td><td>CS asserted → RX_INSTR</td></tr>
+      <tr><td class="m">RX_INSTR</td><td>Shift 8 SPI bits; verify CRC&#8209;3.</td><td>CRC ok → DECODE; CRC bad → set err, IDLE</td></tr>
+      <tr><td class="m">DECODE</td><td>Latch burst/acc/opcode; compute payload length = 1 (control) + (arity − acc) × 2 operand bytes.</td><td>→ RX PAYLOAD (every op has at least a control byte)</td></tr>
+      <tr><td class="m">RX PAYLOAD</td><td>Clock in the control byte, then each bf16 operand as two bytes (high first) over the selected transport, accumulating one CRC&#8209;8; apply CLRA/CLRF from the control byte.</td><td>CRC ok → EXECUTE; CRC bad → set ERR, IDLE</td></tr>
+      <tr><td class="m">EXECUTE</td><td>Assert <code>BUSY</code>; run the datapath for the op's cycle count with the selected rounding mode.</td><td>datapath done → WRITEBACK</td></tr>
+      <tr><td class="m">WRITEBACK</td><td>Store 16&#8209;bit result into ACC; update status (NAN/OVF/UNF/INX), echo TAG.</td><td>→ RETURN</td></tr>
+      <tr><td class="m">RETURN</td><td>Present the two result bytes + status on MISO (poll&#8209;read) or stream on <code>uo_out</code> via <code>out_valid</code>.</td><td>host consumed → IDLE</td></tr>
+    </table>
+  </section>
+
+  <!-- ============ 14. TRANSACTIONS ============ -->
+  <section id="s14">
+    <div class="secnum">SECTION 14</div>
+    <h2>Worked Transactions</h2>
+    <p>Two end&#8209;to&#8209;end examples make the protocol concrete.</p>
+
+    <h3>14.1 SPI multiply, no accumulate (burst=0, acc=0)</h3>
+    <ol>
+      <li>Host pulls <code>spi_cs_n</code> low.</li>
+      <li>Host clocks the instruction byte: <code>burst=0, acc=0, opcode=010 (MUL), CRC3</code>.</li>
+      <li>FPU verifies CRC&#8209;3, decodes MUL → payload = control + 4 operand bytes + CRC&#8209;8.</li>
+      <li>Host clocks the payload: <code>control · op1_hi · op1_lo · op2_hi · op2_lo · CRC8</code> (one CRC over all five data bytes).</li>
+      <li>FPU verifies CRC&#8209;8, asserts <code>BUSY</code>, runs the multiply (≈6–8 cycles), writes the 16&#8209;bit ACC, sets any NAN/OVF/INX flags.</li>
+      <li>Host polls: a read returns the status byte (<code>BUSY=1</code>) until done, then the two result bytes (high first); the status byte's TAG echoes the control byte's TAG.</li>
+      <li>Host raises <code>spi_cs_n</code>.</li>
+    </ol>
+
+    <h3>14.2 Burst accumulate&#8209;add stream (burst=1, acc=1)</h3>
+    <ol>
+      <li>Host sends the instruction byte over SPI: <code>burst=1, acc=1, opcode=000 (ADD)</code>, then the control byte (e.g. <code>CLRA=1</code> on the first to zero ACC).</li>
+      <li>For each value: host drives <code>ui_in</code> + raises <code>in_valid</code>; FPU raises <code>in_ready</code>; the two operand bytes (high first) transfer, then the CRC&#8209;8 byte; FPU checks CRC.</li>
+      <li>FPU computes <code>ACC ← ACC + op2</code> per value (running bf16 sum), updating ACC in place.</li>
+      <li>To read the total, host raises <code>out_ready</code>; FPU raises <code>out_valid</code> and streams the two ACC bytes (high first) plus status.</li>
+    </ol>
+    <div class="note open">
+      <span class="tag">Open Issue — stream framing</span>
+      For a continuous accumulate stream, confirm how a new instruction interleaves with an in&#8209;flight burst. Recommended: one instruction byte arms the mode and the values stream (each as control?/operands + CRC) until the host deasserts <code>cs_n</code> and re&#8209;issues. Decide whether the control byte repeats per value or is sent once when arming.
+    </div>
+  </section>
+
+  <!-- ============ 15. AREA ============ -->
+  <section id="s15">
+    <div class="secnum">SECTION 15</div>
+    <h2>Area &amp; Gate Budget</h2>
+    <p>A first&#8209;order gate estimate (2&#8209;input NAND equivalents, before place&#8209;and&#8209;route overhead). These are planning numbers, not synthesis results; routing and tap/antenna cells typically add 30–50%, which — with the bf16 datapath and 16&#8209;bit registers — puts the design clearly into a 2&#8209;tile budget.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace" font-size="12">
+          <line x1="200" y1="20" x2="200" y2="280" stroke="#C7CDD6"/>
+          <g stroke="#EEF1F4"><line x1="350" y1="20" x2="350" y2="280"/><line x1="500" y1="20" x2="500" y2="280"/><line x1="650" y1="20" x2="650" y2="280"/></g>
+          <g fill="#94A3B8" font-size="10" text-anchor="middle">
+            <text x="200" y="298">0</text><text x="350" y="298">175</text><text x="500" y="298">350</text><text x="650" y="298">525</text>
+          </g>
+          <text x="425" y="316" text-anchor="middle" fill="#64748B" font-size="11">estimated gate equivalents (scale: 175 gates ≈ 150 px)</text>
+          <g>
+            <text x="190" y="44" text-anchor="end" fill="#334155">Datapath (bf16)</text>
+            <rect x="200" y="32" width="411" height="22" fill="#0E7490"/><text x="619" y="48" fill="#0B5A70" font-size="10">~480</text>
+
+            <text x="190" y="80" text-anchor="end" fill="#334155">Register file (16b)</text>
+            <rect x="200" y="68" width="129" height="22" fill="#94A3B8"/><text x="337" y="84" fill="#64748B" font-size="10">~150</text>
+
+            <text x="190" y="116" text-anchor="end" fill="#334155">Control FSM</text>
+            <rect x="200" y="104" width="120" height="22" fill="#334155"/><text x="328" y="120" fill="#334155" font-size="10">~140</text>
+
+            <text x="190" y="152" text-anchor="end" fill="#334155">SPI handler</text>
+            <rect x="200" y="140" width="103" height="22" fill="#C2410C"/><text x="311" y="156" fill="#9A3412" font-size="10">~120</text>
+
+            <text x="190" y="188" text-anchor="end" fill="#334155">I/O handler</text>
+            <rect x="200" y="176" width="86" height="22" fill="#C2410C" opacity="0.75"/><text x="294" y="192" fill="#9A3412" font-size="10">~100</text>
+
+            <text x="190" y="224" text-anchor="end" fill="#334155">Synchronizers</text>
+            <rect x="200" y="212" width="43" height="22" fill="#94A3B8" opacity="0.7"/><text x="251" y="228" fill="#64748B" font-size="10">~50</text>
+
+            <text x="190" y="260" text-anchor="end" fill="#334155">CRC + status/ctrl</text>
+            <rect x="200" y="248" width="60" height="22" fill="#0E7490" opacity="0.6"/><text x="268" y="264" fill="#0B5A70" font-size="10">~70</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>Fig 15.1</b> — Pre-route estimate ≈ <b>1110 gates</b>. With ~40% P&amp;R overhead ≈ 1550 — comfortably a 2-tile (2×2) design.</figcaption>
+    </figure>
+
+    <table class="tbl">
+      <tr><th>Block</th><th class="m">Est. gates</th><th>Dominated by</th></tr>
+      <tr><td>Datapath (bf16)</td><td class="m">~480</td><td>8&#8209;bit add/sub core, 8×8 iterative mul, 8&#8209;bit exponent path, normalizer</td></tr>
+      <tr><td>Register file</td><td class="m">~150</td><td>A, B, ACC (3 × 16 bits)</td></tr>
+      <tr><td>Control FSM</td><td class="m">~140</td><td>state register, decode, payload/byte counters, control-byte handling</td></tr>
+      <tr><td>SPI handler</td><td class="m">~120</td><td>byte receiver, bit pointer, MISO mux</td></tr>
+      <tr><td>I/O handler</td><td class="m">~100</td><td>handshake logic, 2&#8209;byte operand assembly</td></tr>
+      <tr><td>Synchronizers</td><td class="m">~50</td><td>SPI CDC flops + edge detect</td></tr>
+      <tr><td>CRC + status/control</td><td class="m">~70</td><td>CRC&#8209;3 + CRC&#8209;8 LFSRs, control decode, status flags</td></tr>
+      <tr><td class="m"><strong>Subtotal</strong></td><td class="m"><strong>~1110</strong></td><td>before place &amp; route</td></tr>
+    </table>
+
+    <div class="note decision">
+      <span class="tag">Design Decision — D5 · target 2 tiles (2×2)</span>
+      ~1110 pre&#8209;route gates plus routing overhead exceed a single tile and a 1×2 leaves little margin. <strong>Budget a 2×2 footprint.</strong> If area must shrink, the cheapest cut is dropping <code>DIV</code> (removes the divide sequencer); a deeper cut would be a narrower float, which shrinks the registers and the significand multiply.
+    </div>
+  </section>
+
+  <!-- ============ 16. RESET/CLK ============ -->
+  <section id="s16">
+    <div class="secnum">SECTION 16</div>
+    <h2>Reset, Clocking &amp; Power</h2>
+    <ul>
+      <li><strong>Clock.</strong> Single clock domain on the board <code>clk</code> at <strong>40 MHz</strong> (25 ns). SPI signals are sampled into this domain through 2&#8209;flop synchronizers at 4× oversampling (SCK = 10 MHz); the design never uses <code>spi_sck</code> as a true clock. This keeps the whole core synchronous and synthesis&#8209;friendly.</li>
+      <li><strong>Reset.</strong> <code>rst_n</code> is active&#8209;low and applied synchronously (the board clock free&#8209;runs, so a sync reset is glitch&#8209;immune and clean for STA/DFT). On reset: ACC = +0.0, A/B cleared, status cleared, all output enables driven to their idle values, FSM → IDLE.</li>
+      <li><strong>Enable.</strong> When <code>ena</code> is low the tile is not selected; outputs hold their reset/idle values.</li>
+      <li><strong>No floating outputs.</strong> Per Tiny Tapeout rules, every unused <code>uo_out</code> / <code>uio_out</code> / <code>uio_oe</code> bit is tied to a defined value (0). FPU&#8209;130 uses all output pins, but any reserved bits default to 0.</li>
+    </ul>
+    <div class="note">
+      <span class="tag" style="color:var(--muted)">Resolved — operating point fixed (D6)</span>
+      Core <code>clk</code> = 40 MHz, SCK = 10 MHz, 4× oversampling. The worst&#8209;case path is expected to be the normalizer's leading&#8209;one detect over the 8&#8209;bit bf16 significand — a short path that should close comfortably at 25 ns, but it must be confirmed against actual synthesis. SCK is capped at <code>clk</code> ÷ 4 = 10 MHz (§7.3).
+    </div>
+  </section>
+
+  <!-- ============ 17. VERIFICATION ============ -->
+  <section id="s17">
+    <div class="secnum">SECTION 17</div>
+    <h2>Verification Plan</h2>
+    <p>Tiny Tapeout supports cocotb test benches that can later be replayed against the real chip via the demo board. The plan:</p>
+    <table class="tbl">
+      <tr><th>Level</th><th>What it checks</th></tr>
+      <tr><td>Unit — datapath</td><td>Each op (ADD/SUB/MUL/DIV/NEG/ABS/SLT) against a golden software bfloat16 reference across a directed corner set (±0, ±Inf, NaN, max finite, smallest normal, div&#8209;by&#8209;0) plus randomized vectors; exercise all four rounding modes.</td></tr>
+      <tr><td>Unit — CRC</td><td>CRC&#8209;3/CRC&#8209;8 against published reference vectors; deliberate bit&#8209;flips must raise <code>err</code>.</td></tr>
+      <tr><td>Protocol — SPI</td><td>Mode&#8209;0 framing, instruction+data sequencing, busy polling, read&#8209;back; bad&#8209;CRC frames dropped.</td></tr>
+      <tr><td>Protocol — burst</td><td>valid/ready handshake including back&#8209;to&#8209;back transfer, stalls (ready low), and result streaming.</td></tr>
+      <tr><td>Mode matrix</td><td>All four burst×acc combinations from §10.</td></tr>
+      <tr><td>Integration</td><td>Full transactions from §14, then re&#8209;run as hardware&#8209;in&#8209;the&#8209;loop on the demo board.</td></tr>
+    </table>
+  </section>
+
+  <!-- ============ 18. OPEN ISSUES ============ -->
+  <section id="s18">
+    <div class="secnum">SECTION 18</div>
+    <h2>Open Issues &amp; Roadmap</h2>
+    <p>Consolidated list of everything flagged above that needs your sign&#8209;off before RTL starts:</p>
+    <table class="tbl">
+      <tr><th class="m">ID</th><th>Decision</th><th>Status / recommendation</th></tr>
+      <tr><td class="m">D1</td><td>Number format</td><td><strong>Resolved:</strong> bfloat16 (1·8·7). Drop to a narrower float only if area forces it.</td></tr>
+      <tr><td class="m">D2</td><td>Iterative vs combinational datapath</td><td><strong>Resolved:</strong> iterative, shared add/sub core.</td></tr>
+      <tr><td class="m">D5</td><td>Tile count</td><td><strong>Resolved:</strong> 2 tiles (2×2). Confirm against live TT pricing.</td></tr>
+      <tr><td class="m">D6</td><td>Operating point</td><td><strong>Resolved:</strong> 40 MHz core / 10 MHz SCK (4× oversampling).</td></tr>
+      <tr><td class="m">D7</td><td>Control byte / status byte</td><td><strong>Resolved (confirm bits):</strong> control byte in (RND/CLRA/CLRF/SAT/TAG), status byte out (BUSY/NAN/OVF/UNF/INX/ERR/TAG).</td></tr>
+      <tr><td class="m">O2</td><td>MISO tri&#8209;state vs always&#8209;driven</td><td>Open — recommend driving 0 when deselected (constant OE).</td></tr>
+      <tr><td class="m">O4</td><td>Burst stream framing</td><td>Open — recommend one instruction arms the mode until CS toggles; decide if control byte repeats per value.</td></tr>
+      <tr><td class="m">O5</td><td>Confirm current TT pricing / 2&#8209;tile cost</td><td>Open — check the live TT pricing page.</td></tr>
+    </table>
+
+    <p style="color:var(--muted);font-size:0.9em">Resolved since Rev 0.2: the format (D1 → bf16), the single operand&#8209;region CRC (D4), the operating point and oversampling margin (was O3, now D6), and the exception/status reporting (was O1, now D7 + §9.1).</p>
+
+    <h4>Suggested next steps</h4>
+    <ol>
+      <li>Confirm the D7 bit assignments (control/status bytes) and O2 (MISO drive) — these freeze the host&#8209;facing interface.</li>
+      <li>Confirm O4 (burst stream framing) so the streaming case is unambiguous.</li>
+      <li>Write the cocotb bfloat16 reference model first (it doubles as the spec's executable check), then the RTL; close timing against the 40 MHz target.</li>
+    </ol>
+  </section>
+
+  <div class="footer">
+    FPU&#8209;130 · Design Specification Rev 0.4 (bf16 + control/status byte) · Sky130 / Tiny Tapeout · Generated 2026-06-25.<br>
+    Items marked Design Decision / Correction / Open Issue diverge from or extend Rev 0.1 and need author confirmation.
+  </div>
+
+</div>
+</body>
+</html>
