@@ -1,7 +1,10 @@
-name: docs
+name: deploy-fpu-design-spec
 
 on:
   push:
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yaml"
   workflow_dispatch:
 
 permissions:
@@ -19,11 +22,11 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
-      - name: Build docs
-        uses: TinyTapeout/tt-gds-action/docs@ttsky26c
+      - name: Validate design spec files
+        run: |
+          test -f docs/FPU_Design_Spec_v0.4_1.html
+          test -f docs/index.html
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
