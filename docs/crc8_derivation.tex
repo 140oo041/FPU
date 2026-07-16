@@ -1,0 +1,385 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\geometry{margin=1in}
+
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{codecomment}{RGB}{80,80,80}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  commentstyle=\color{codecomment},
+  frame=single,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\title{Deriving the CRC-8 Update From $R_n$ to $R_{n+1}$}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Goal}
+
+For a serial, MSB-first CRC, the update logic is often written in hardware as
+\[
+\mathit{fb} = \mathit{mosi} \oplus \mathit{crc}[7].
+\]
+This can look surprising at first, because long division is usually described as
+``look at the current MSB, then divide.'' The missing detail is that the next
+dividend bit is brought down at the same step. In the LFSR form, those two actions
+collapse into the single feedback term above.
+
+This note derives the recurrence for the next remainder $R_{n+1}$ from the current
+remainder $R_n$ and then maps the result directly to Verilog.
+
+\section{CRC Definition}
+
+Let the generator polynomial be
+\[
+g(x) = x^8 + p(x),
+\]
+where $p(x)$ contains the lower-order tap terms.
+
+For CRC-8/AUTOSAR,
+\[
+g(x) = x^8 + x^4 + x^3 + x^2 + 1,
+\]
+so
+\[
+p(x) = x^4 + x^3 + x^2 + 1.
+\]
+
+Let $D_n(x)$ be the polynomial formed by the first $n$ message bits that have
+already been processed, and let $R_n(x)$ be the current 8-bit remainder. The
+standard CRC definition is
+\[
+R_n(x) = x^8 D_n(x) \bmod g(x).
+\]
+
+\section{Appending One More Bit}
+
+Suppose the next input bit is $b_n \in \{0,1\}$. Appending one bit to the message
+polynomial gives
+\[
+D_{n+1}(x) = xD_n(x) + b_n.
+\]
+
+Substitute that into the CRC definition:
+\begin{align*}
+R_{n+1}(x)
+&= x^8 D_{n+1}(x) \bmod g(x) \\
+&= x^8 (xD_n(x) + b_n) \bmod g(x) \\
+&= (x \cdot x^8 D_n(x) + b_n x^8) \bmod g(x).
+\end{align*}
+
+Because $x^8 D_n(x) \bmod g(x) = R_n(x)$, this becomes
+\[
+R_{n+1}(x) = \bigl(xR_n(x) + b_n x^8\bigr) \bmod g(x).
+\]
+
+\section{Where the Feedback XOR Comes From}
+
+Write the current remainder as
+\[
+R_n(x) = r_7 x^7 + r_6 x^6 + r_5 x^5 + r_4 x^4 + r_3 x^3 + r_2 x^2 + r_1 x + r_0.
+\]
+
+After multiplying by $x$,
+\[
+xR_n(x) = r_7 x^8 + r_6 x^7 + r_5 x^6 + r_4 x^5 + r_3 x^4 + r_2 x^3 + r_1 x^2 + r_0 x.
+\]
+
+Now include the new message bit:
+\[
+xR_n(x) + b_n x^8 =
+(r_7 \oplus b_n)x^8 + r_6 x^7 + r_5 x^6 + r_4 x^5 + r_3 x^4 + r_2 x^3 + r_1 x^2 + r_0 x.
+\]
+
+The coefficient of $x^8$ is therefore
+\[
+f = r_7 \oplus b_n.
+\]
+
+This is exactly the serial hardware feedback term:
+\[
+\boxed{f = \mathit{crc}[7] \oplus \mathit{mosi}}
+\]
+for an MSB-first implementation.
+
+\section{Reducing the $x^8$ Term}
+
+Since
+\[
+g(x) = x^8 + p(x),
+\]
+we have the congruence
+\[
+x^8 \equiv p(x) \pmod{g(x)}.
+\]
+
+So every time the coefficient $f$ of $x^8$ is 1, the polynomial $p(x)$ must be XORed
+back into the shifted remainder. That yields the recurrence
+\[
+R_{n+1}(x) = \operatorname{shift}(R_n(x)) \oplus f\,p(x),
+\]
+where
+\[
+\operatorname{shift}(R_n(x)) = r_6 x^7 + r_5 x^6 + r_4 x^5 + r_3 x^4 + r_2 x^3 + r_1 x^2 + r_0 x.
+\]
+
+So the generic serial CRC update is
+\[
+\boxed{R_{n+1} = \operatorname{shift}(R_n) \oplus (r_7 \oplus b_n)\,p(x)}.
+\]
+
+\section{Bit Equations for CRC-8/AUTOSAR}
+
+For CRC-8/AUTOSAR,
+\[
+p(x) = x^4 + x^3 + x^2 + 1.
+\]
+
+That means the feedback bit $f$ is XORed into the stages corresponding to
+$x^4$, $x^3$, $x^2$, and $x^0$. The next-state equations are
+\begin{align*}
+r_7' &= r_6 \\
+r_6' &= r_5 \\
+r_5' &= r_4 \\
+r_4' &= r_3 \oplus f \\
+r_3' &= r_2 \oplus f \\
+r_2' &= r_1 \oplus f \\
+r_1' &= r_0 \\
+r_0' &= f.
+\end{align*}
+
+This is the usual MSB-first, serial LFSR form.
+
+\section{Matching Verilog}
+
+\begin{lstlisting}[language=Verilog]
+module crc8_autosar_serial (
+  input  wire       clk,
+  input  wire       rst_n,
+  input  wire       enable,
+  input  wire       mosi,
+  output reg  [7:0] crc
+);
+
+  wire fb = crc[7] ^ mosi;
+
+  always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      crc <= 8'hFF; // AUTOSAR seed
+    end else if (enable) begin
+      crc[7] <= crc[6];
+      crc[6] <= crc[5];
+      crc[5] <= crc[4];
+      crc[4] <= crc[3] ^ fb;
+      crc[3] <= crc[2] ^ fb;
+      crc[2] <= crc[1] ^ fb;
+      crc[1] <= crc[0];
+      crc[0] <= fb;
+    end
+  end
+endmodule
+\end{lstlisting}
+
+If the final AUTOSAR CRC byte is needed, apply the final XOR after all bits are
+processed:
+\[
+\mathit{crc\_out} = \mathit{crc} \oplus \texttt{8'hFF}.
+\]
+
+\section{Why \texttt{mosi} Must Be in the Feedback}
+
+If the update used only $\mathit{crc}[7]$, then the state evolution would depend
+only on the previous remainder, not on the actual incoming message bit at every
+tap point required by the polynomial. That would no longer implement the same
+polynomial division.
+
+The feedback XOR
+\[
+\mathit{crc}[7] \oplus \mathit{mosi}
+\]
+is the coefficient of the new $x^8$ term after both of the following happen:
+\begin{enumerate}
+\item the previous remainder is shifted by one power of $x$;
+\item the next message bit is appended.
+\end{enumerate}
+
+That is why the incoming bit affects the same reduction decision as the outgoing
+MSB of the remainder.
+
+\section{Alternate Derivation Using Physical Bit Insertion}
+
+The previous derivation used the standard CRC definition
+\[
+R_n(x) = x^8 D_n(x) \bmod g(x).
+\]
+It is also possible to derive a valid serial update rule directly from the physical
+LFSR behavior, without starting from that definition.
+
+Assume the register is interpreted as
+\[
+S_n(x) = s_0 + s_1 x + s_2 x^2 + \cdots + s_7 x^7,
+\]
+where $s_i = \texttt{crc}[i]$.
+
+Now assume the serial hardware behaves as follows:
+\begin{enumerate}
+\item the new input bit $m$ (that is, \texttt{mosi}) is inserted into stage \texttt{crc[0]};
+\item all existing register contents shift left by one stage on the clock edge.
+\end{enumerate}
+
+Under that convention, the raw shift-and-insert step is
+\[
+T(x) = xS_n(x) + m.
+\]
+
+This is because multiplying by $x$ shifts every stored term up by one power, while
+adding $m$ inserts the new bit at $x^0$.
+
+Expanding,
+\[
+T(x) = m + s_0 x + s_1 x^2 + s_2 x^3 + s_3 x^4 + s_4 x^5 + s_5 x^6 + s_6 x^7 + s_7 x^8.
+\]
+
+The only term that does not fit in an 8-bit register is the overflow term $s_7 x^8$.
+For CRC-8/AUTOSAR,
+\[
+g(x) = x^8 + x^4 + x^3 + x^2 + 1.
+\]
+Working modulo $g(x)$ means that $g(x)$ itself is equivalent to zero:
+\[
+g(x) \equiv 0 \pmod{g(x)}.
+\]
+Therefore,
+\[
+x^8 + x^4 + x^3 + x^2 + 1 \equiv 0 \pmod{g(x)}.
+\]
+In $\mathrm{GF}(2)$, subtraction and addition are the same operation, so rearranging
+the terms gives
+\[
+x^8 \equiv x^4 + x^3 + x^2 + 1 \pmod{g(x)}.
+\]
+This is why the overflow term is reduced as
+\[
+s_7 x^8 \equiv s_7(x^4 + x^3 + x^2 + 1).
+\]
+
+Substituting that back in,
+\[
+S_{n+1}(x) =
+m + s_0 x + s_1 x^2 + s_2 x^3 + s_3 x^4 + s_4 x^5 + s_5 x^6 + s_6 x^7
++ s_7(x^4 + x^3 + x^2 + 1).
+\]
+
+Collecting powers of $x$ gives
+\[
+S_{n+1}(x) =
+(m \oplus s_7)
++ s_0 x
++ (s_1 \oplus s_7)x^2
++ (s_2 \oplus s_7)x^3
++ (s_3 \oplus s_7)x^4
++ s_4 x^5
++ s_5 x^6
++ s_6 x^7.
+\]
+
+Therefore the next-state equations are
+\begin{align*}
+s_0' &= m \oplus s_7 \\
+s_1' &= s_0 \\
+s_2' &= s_1 \oplus s_7 \\
+s_3' &= s_2 \oplus s_7 \\
+s_4' &= s_3 \oplus s_7 \\
+s_5' &= s_4 \\
+s_6' &= s_5 \\
+s_7' &= s_6.
+\end{align*}
+
+So \texttt{mosi} is still part of the update in this convention, but it enters only
+through the newly inserted low-order term:
+\[
+s_0' = \texttt{mosi} \oplus s_7.
+\]
+The tapped reductions at $x^2$, $x^3$, and $x^4$ come only from reducing the
+overflow term $s_7 x^8$, so they depend on $s_7$ alone:
+\[
+s_2' = s_1 \oplus s_7,\qquad
+s_3' = s_2 \oplus s_7,\qquad
+s_4' = s_3 \oplus s_7.
+\]
+That is why this alternate convention does not collapse into the same single
+shared feedback term $\texttt{crc[7]} \oplus \texttt{mosi}$ used by the earlier
+MSB-first AUTOSAR derivation.
+
+The corresponding Verilog is
+\begin{lstlisting}[language=Verilog]
+module crc8_shift_left_insert_lsb (
+  input  wire       clk,
+  input  wire       rst_n,
+  input  wire       enable,
+  input  wire       mosi,
+  output reg  [7:0] crc
+);
+
+  wire overflow = crc[7];
+
+  always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      crc <= 8'h00;
+    end else if (enable) begin
+      crc[0] <= mosi ^ overflow;
+      crc[1] <= crc[0];
+      crc[2] <= crc[1] ^ overflow;
+      crc[3] <= crc[2] ^ overflow;
+      crc[4] <= crc[3] ^ overflow;
+      crc[5] <= crc[4];
+      crc[6] <= crc[5];
+      crc[7] <= crc[6];
+    end
+  end
+endmodule
+\end{lstlisting}
+
+\section{Relation Between the Two Derivations}
+
+This alternate derivation is mathematically consistent, but it is a different
+serial convention from the earlier MSB-first AUTOSAR form.
+
+In the earlier derivation,
+\begin{itemize}
+\item the state is interpreted as the standard CRC remainder;
+\item the feedback term is $\texttt{crc[7]} \oplus \texttt{mosi}$;
+\item the result matches the usual non-reflected AUTOSAR CRC-8 implementation.
+\end{itemize}
+
+In the alternate derivation above,
+\begin{itemize}
+\item the state is interpreted directly from the physical register layout;
+\item the new bit is inserted at $x^0$ and then shifted toward higher powers;
+\item \texttt{mosi} affects the low-order update directly, while the tap XORs come
+from reducing the overflow term $s_7 x^8$;
+\item the resulting recurrence is different, even though it still comes from the
+same generator polynomial.
+\end{itemize}
+
+So the placement of the incoming bit at the physical low end of the register does
+not by itself determine the CRC convention. The state definition and shift
+direction determine which recurrence is correct.
+
+\end{document}

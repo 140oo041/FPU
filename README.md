@@ -2,11 +2,9 @@
 
 # FPU-130
 
-FPU-130 is a Tiny Tapeout floating-point coprocessor designed around a compact, iterative `bfloat16` datapath. It accepts commands and operands from a host over SPI, supports a higher-throughput parallel burst path for operand streaming, and returns a `bfloat16` result together with status flags.
+FPU-130 is a floating-point coprocessor built around a compact, iterative `bfloat16` datapath. A host talks to it over SPI to issue commands and send operands, can stream operands faster through a parallel burst path, and gets back a `bfloat16` result along with status flags. The design is being developed toward tapeout on the SkyWater 130nm (Sky130) shuttle through Tiny Tapeout.
 
-The full design specification lives in [docs/FPU_Design_Spec_v0.4_1.html](docs/FPU_Design_Spec_v0.4_1.html). This repository currently contains that spec, project scaffolding, and early RTL/testbench work.
-
-If you want to publish the spec with GitHub Pages, this repo now includes [docs/index.html](docs/index.html) as a Pages landing page for the design spec. In the repository settings, set Pages to deploy from the `main` branch and the `/docs` folder.
+The full design spec is published at [140oo041.github.io/FPU](https://140oo041.github.io/FPU/); the source lives in [docs/FPU_Design_Spec_v0.4_1.html](docs/FPU_Design_Spec_v0.4_1.html). This repository also holds the project scaffolding and early RTL/testbench work — see [Project Status](#project-status) below for where things stand.
 
 ## Design Summary
 
@@ -33,7 +31,7 @@ If you want to publish the spec with GitHub Pages, this repo now includes [docs/
 | `110` | `SLT` | returns `1.0` if `a < b`, else `0.0` |
 | `111` | `NOP` | no writeback, used for status/control flow |
 
-Latency is variable by operation. The spec budgets roughly `3-4` cycles for add/sub, `6-8` for multiply, and `6-10` for divide, which is why the host must poll `BUSY` or use the burst-side output handshake instead of assuming fixed timing.
+Latency varies by operation: the spec budgets roughly `3-4` cycles for add/sub, `6-8` for multiply, and `6-10` for divide. Because timing isn't fixed, the host needs to either poll `BUSY` or wait on the burst-side output handshake rather than assuming a result is ready after a set number of cycles.
 
 ## Number Format
 
@@ -43,7 +41,7 @@ All operands and results use `bfloat16`. Each value is transferred as two bytes,
 - `bits 14:7`: exponent with bias `127`
 - `bits 6:0`: mantissa
 
-This keeps the exponent compatible with IEEE-754 `fp32`, so a host can usually generate `bfloat16` values by truncating the top 16 bits of an `fp32`.
+Because the exponent is compatible with IEEE-754 `fp32`, a host can usually get away with just truncating an `fp32` value down to its top 16 bits to produce a `bfloat16`.
 
 ## Interface
 
@@ -103,9 +101,9 @@ The FPU returns a status byte with:
 
 ## Burst Mode
 
-When `burst = 1`, the instruction still arrives over SPI, but operand payload bytes move over the dedicated `ui_in[7:0]` bus using `in_valid`/`in_ready`. Results return on `uo_out[7:0]` with `out_valid`/`out_ready`.
+When `burst = 1`, the instruction byte still arrives over SPI, but the operand payload moves over the dedicated `ui_in[7:0]` bus instead, using `in_valid`/`in_ready` handshaking. Results come back the same way, on `uo_out[7:0]` with `out_valid`/`out_ready`.
 
-This mode is intended for streaming workloads, especially accumulate chains where the host repeatedly feeds one new operand while reusing `ACC` as the first operand.
+This mode is built for streaming workloads — particularly accumulate chains, where the host repeatedly feeds in one new operand at a time while the FPU reuses `ACC` as the other.
 
 ## Microarchitecture
 
@@ -118,7 +116,7 @@ The design is intentionally area-driven rather than throughput-driven:
 - 16-bit `ACC` register for chaining results
 - transport handlers for SPI and burst I/O
 
-The spec's first-order estimate places the full design at roughly `1110` gate equivalents before place-and-route overhead, which is why it recommends budgeting for a `2x2` Tiny Tapeout footprint rather than a single tile.
+The spec's first-order estimate puts the full design at roughly `1110` gate equivalents before place-and-route overhead — big enough that it recommends budgeting for a `2x2` Tiny Tapeout footprint rather than a single tile.
 
 ## Repository Layout
 
@@ -153,10 +151,10 @@ gtkwave tb.fst tb.gtkw
 
 ## Project Status
 
-The spec is substantially more complete than the current RTL. In particular:
+The spec is well ahead of the RTL at this point. A few things to keep in mind:
 
 - the top-level source in [src/project.v](src/project.v) is still an early scaffold
 - `info.yaml` and [docs/info.md](docs/info.md) are still template content
 - the existing tests focus mainly on the current SPI receive path, not the full arithmetic datapath defined in the spec
 
-So this repository should currently be read as "design specification plus early implementation work", not as a finished Tiny Tapeout submission.
+In short, treat this repo as a design specification plus early implementation work in progress — not yet a finished Tiny Tapeout submission.
