@@ -7,6 +7,16 @@ FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = project.v
+PROJECT_SOURCES += FPU_Unit/fpu_system.v
+PROJECT_SOURCES += FPU_Unit/fpu_core.v
+PROJECT_SOURCES += FPU_Unit/sign_gen.v
+PROJECT_SOURCES += Formatting/alignment_shifter.v
+PROJECT_SOURCES += Formatting/normalizer.v
+PROJECT_SOURCES += Formatting/rounder.v
+PROJECT_SOURCES += Divider/dividerLUT.v
+PROJECT_SOURCES += Multiplier/dadda_multiplier.v
+PROJECT_SOURCES += Adders/fullAdder.v
+PROJECT_SOURCES += Adders/halfAdder.v
 
 ifneq ($(GATES),yes)
 

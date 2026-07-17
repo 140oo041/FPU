@@ -5,6 +5,17 @@
 
 `default_nettype none
 
+/*
+
+    .sclk(uio_in[3]),          // SPI clock from uio_in[0]
+    .cs(uio_in[0]),            // SPI chip select from uio_in[1]
+    .mosi(uio_in[1]),          // SPI master out slave in from uio_in[2]
+    .clk(clk),                 // System clock
+    .rst_n(rst_n),             // Active low reset
+    .miso(uio_out[2]),         // SPI master in slave out to uio_out[0]
+
+*/
+
 module tt_um_example (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
@@ -22,6 +33,7 @@ module tt_um_example (
 
   wire [2:0] next_state;
   wire [2:0] state;
+  wire data_transmitted;
 
   fsm fsm_inst (
     .clk(clk),
@@ -30,7 +42,10 @@ module tt_um_example (
     .data_ready(data_ready),
     .error(spi_error),
     .next_state(next_state),
-    .state(state)
+    .state(state),
+    .result_ready(result_ready),
+    .data_transmitted(data_transmitted),
+    .data_received(data_received)
   );
 
 /*
@@ -50,7 +65,7 @@ module tt_um_example (
   three_bit_counter byte_counter_inst (
     .clk(clk),
     .count_clk(data_ready_rising_edge),
-    .rst_n(rst_n),
+    .rst_n(rst_n | (state != 3'b001 & state != 3'b000)), // Reset counter when not in RECEIVE or PROCESS state
     .count(byte_count)
   );
 
@@ -62,15 +77,20 @@ module tt_um_example (
   reg[7:0] opcode;
   reg[15:0] op1;
   reg[15:0] op2;
+  reg [3:0] num_bytes;
+  reg data_received;
 
   always @(negedge clk) begin
     if(!rst_n) begin
       opcode <= 8'b0;
       op1 <= 16'b0;
       op2 <= 16'b0;
+      data_received <= 1'b0;
     end else if(data_ready_second_edge) begin
+      if(byte_count >= num_bytes && num_bytes != 0) begin data_received <= 1'b1; end
+      else begin data_received <= 1'b0; end
       case(byte_count)
-        3'b001: opcode <= received_data;
+        3'b001: begin opcode <= received_data; num_bytes <= opcode[3:0]; end
         3'b010: op1[15:8] <= received_data;
         3'b011: op1[7:0] <= received_data;
         3'b100: op2[15:8] <= received_data;
@@ -83,6 +103,15 @@ module tt_um_example (
       endcase
     end
   end
+
+  // always @(*) begin
+  //   if(!rst_n) begin
+  //     data_received <= 1'b0;
+  //   end else if(state != 3'b001) begin
+  //     data_received <= 1'b0;
+  //     byte_count = 3'b000;
+  //   end
+  // end
 
 /*
   SPI module instantiation
@@ -106,7 +135,10 @@ module tt_um_example (
     .error(spi_error),       // SPI error signal
     .cs_sync_t(cs_sync),
     .state(state),
-    .next_state(next_state)
+    .next_state(next_state),
+    .status(status),
+    .accumulated_data(accumulate_register),
+    .transmitted(data_transmitted)
   );
 
 
@@ -115,6 +147,13 @@ module tt_um_example (
 */
 
 wire[15:0] accumulate_register;
+
+// FPU error flags are computed but not surfaced on any pin in this design.
+// They are connected to real wires and tied into `_unused` below so the
+// linter flags neither a missing pin nor an unused signal.
+wire fpu_flag_NAN;
+wire fpu_flag_overflow;
+wire fpu_flag_underflow;
 
 fpu_system fpu_system_inst (
     .clk(clk),
@@ -125,9 +164,12 @@ fpu_system fpu_system_inst (
     .op(opcode[7:5]),
     .acc(opcode[4]),
     .accumulate_register(accumulate_register),
-    .result_ready(uio_oe[3]));
-
-
+    .result_ready(result_ready),
+    .flag_NAN(fpu_flag_NAN),
+    .flag_overflow(fpu_flag_overflow),
+    .flag_underflow(fpu_flag_underflow));
+  wire result_ready;
+  wire[7:0] status = {2'b0, spi_error, 1'b1, fpu_flag_underflow,fpu_flag_overflow,fpu_flag_NAN, result_ready}; // 8-bit status with error and data_ready flags
 
     // List all unused inputs to prevent warnings
   wire _unused = &{ena,ui_in[7:0], 1'b0,uio_in[7:4]};
@@ -137,6 +179,8 @@ fpu_system fpu_system_inst (
   assign uio_out[7:3] = 0;
   assign uio_out[1:0] = 0; //uio_out[2] is used for MISO in SPI, so we don't assign it to 0.
   assign uio_oe  = 4;
+
+
 
 endmodule
 
@@ -148,11 +192,14 @@ module SPI (
   input wire rst_n,
   input wire [2:0] next_state,
   input wire [2:0] state,
-  output wire miso,
+  input wire [7:0] status,
+  input wire [7:0] accumulated_data,
+  output reg miso,
   output wire [7:0] received_data,
   output wire data_ready,
   output wire error,
-  output wire cs_sync_t
+  output wire cs_sync_t,
+  output wire transmitted
 
 );
 
@@ -210,9 +257,9 @@ assign cs_sync_t = cs_sync;
 
   //4 bit counter
 
-  byte_counter bit_counter_inst (
+  byte_counter bit_counter_receive_inst (
     .clk(clk),
-    .count_clk(sclk_rising_edge),
+    .count_clk(cs_sync & sclk_rising_edge && state == RECEIVE),
     .rst_n(rst_n),
     .count(bit_count)
   );
@@ -226,10 +273,32 @@ assign cs_sync_t = cs_sync;
       shift_reg <= 8'b0;
     end else if (state == PROCESS) begin
       shift_reg <= 8'b0;
-    end else if (state == WRITEBACK) begin
+    end else if (sclk_rising_edge && cs_sync && state == WRITEBACK) begin
+      if(out_bit_count <= 4'b0111) begin
+        shift_reg <= {shift_reg[6:0], status[out_bit_count]}; // Shift left and fill with 0
+        miso <= shift_reg[7]; // Send the MSB first
+      end else if (out_bit_count >= 4'b1000) begin
+        shift_reg <= {shift_reg[6:0], accumulated_data[out_bit_count[2:0]]}; // Hold the value after 8 bits have been sent
+        miso <= shift_reg[7]; // Send the MSB first
+        
+      end
+    end else if (state == WRITEBACK && !cs_sync) begin
       shift_reg <= 8'b0;
+      miso <= 1'b0;
     end
   end
+
+  assign transmitted = (out_bit_count == 4'b1111) && cs_sync && sclk_rising_edge && state == WRITEBACK;
+
+  
+  wire[3:0] out_bit_count;
+
+  four_bit_counter bit_counter_writeback_inst (
+    .clk(clk),
+    .count_clk(cs_sync & sclk_rising_edge && state == WRITEBACK),
+    .rst_n(rst_n),
+    .count(out_bit_count)
+  );
 
 
   assign  received_data = shift_reg;
@@ -246,7 +315,7 @@ assign cs_sync_t = cs_sync;
     .crc(crc_out)
   );
 
-  assign error = ((crc_out^8'hFF) != 8'b00000000) && data_ready;
+  assign error = (crc_out != 8'h42) && data_ready;
 
 
 
@@ -283,6 +352,32 @@ module byte_counter (
   end
 endmodule
 
+module four_bit_counter (
+  input wire clk,
+  input wire count_clk,
+  input wire rst_n,
+  output reg [3:0] count
+);
+
+  reg count_clk_d;
+  wire count_clk_edge = count_clk & ~count_clk_d;
+
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      count <= 4'b0000;
+      count_clk_d <= 1'b0;
+    end else begin
+      count_clk_d <= count_clk;
+      if(count_clk_edge) begin
+        count[0] <= ~count[0];
+        count[1] <= count[0] ^ count[1];
+        count[2] <= (count[0] & count[1]) ^ count[2];
+        count[3] <= (count[0] & count[1] & count[2]) ^ count[3];
+      end
+    end
+  end
+endmodule
+
 module three_bit_counter (
   input wire clk,
   input wire count_clk,
@@ -303,6 +398,30 @@ module three_bit_counter (
         count[0] <= ~count[0];
         count[1] <= count[0] ^ count[1];
         count[2] <= (count[0] & count[1]) ^ count[2];
+      end
+    end
+  end
+endmodule
+
+module two_bit_counter (
+  input wire clk,
+  input wire count_clk,
+  input wire rst_n,
+  output reg [1:0] count
+);
+
+  reg count_clk_d;
+  wire count_clk_edge = count_clk & ~count_clk_d;
+
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      count <= 2'b00;
+      count_clk_d <= 1'b0;
+    end else begin
+      count_clk_d <= count_clk;
+      if(count_clk_edge) begin
+        count[0] <= ~count[0];
+        count[1] <= count[0] ^ count[1];
       end
     end
   end
@@ -363,6 +482,9 @@ module fsm (
   input wire cs_sync,
   input wire data_ready,
   input wire error,
+  input wire data_transmitted,
+  input wire data_received,
+  input wire result_ready,
   output reg [2:0] next_state,
   output reg [2:0] state
 );
@@ -382,7 +504,7 @@ always @(*) begin
       end
     end
     RECEIVE: begin
-      if(~cs_sync) begin
+      if(data_received) begin
           next_state = PROCESS;
         end
       else begin
@@ -390,10 +512,25 @@ always @(*) begin
       end
     end
     PROCESS: begin
-      next_state = IDLE;
+      if(result_ready) begin
+        next_state = WRITEBACK;
+      end else begin
+        next_state = PROCESS;
+      end
+    end
+    WRITEBACK: begin
+      if(data_transmitted) begin
+        next_state = IDLE;
+      end else begin
+        next_state = WRITEBACK;
+      end
     end
     default: begin
-      next_state = IDLE;
+      if(data_transmitted) begin
+        next_state = IDLE;
+      end else begin
+        next_state = WRITEBACK;
+      end
     end
   endcase
 end
@@ -405,58 +542,5 @@ always @(posedge clk) begin
     state <= next_state;
   end
 end
-
-endmodule
-
-module fpu_system(
-    input wire clk,
-    input wire reset_n,
-    input wire data_ready,
-    input wire[15:0] A, B, //I/O Registers
-    input wire[2:0] op, //I/O Registers
-    input wire acc, //I/O Registers
-    output reg[15:0] accumulate_register, //Register in FPU_System 
-    output reg result_ready
-    );
-
-    wire[15:0] datapath_result;
-    wire accumulate_register_enable;
-    wire[15:0] input_a;
-        assign input_a = acc ? accumulate_register : A;
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if(!reset_n) begin
-            accumulate_register <= 16'b0;
-            result_ready <= 1'b0;
-        end
-
-        else if(data_ready && accumulate_register_enable) begin
-            accumulate_register <= datapath_result;
-            result_ready <= 1'b1;
-        end
-
-        else begin
-            result_ready <= 1'b0;
-        end
-    end
-
-    fpu_core fpuCore(
-        .A(input_a),
-        .B(B),
-        .op(op),
-        .result(datapath_result),
-        .accumulate_enable(accumulate_register_enable)
-    );
-
-
-endmodule
-
-module fpu_core(
-  input wire[15:0] A,
-  input wire[15:0] B,
-  input wire[2:0] op,
-  output wire[15:0] result,
-  output wire accumulate_enable
-);
 
 endmodule

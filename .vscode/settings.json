@@ -1,4 +1,5 @@
 {
   "verilog.linting.linter": "verilator",
-  "verilog.formatting.verilogHDL.formatter": "verible-verilog-format"
+  "verilog.formatting.verilogHDL.formatter": "verible-verilog-format",
+  "verilog.linting.verilator.arguments": "+incdir+src -y src/FPU_Unit -y src/Formatting -y src/Divider -y src/Multiplier -y src/Adders +libext+.v"
 }
