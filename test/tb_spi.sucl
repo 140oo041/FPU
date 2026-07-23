@@ -1,0 +1,34 @@
+# Surfer command file for the SPI unit testbench waveform (tb_spi.fst).
+# Adds a default set of signals grouped by function.
+#
+# CLI:  surfer -c tb_spi.sucl tb_spi.fst
+# VS Code Surfer extension: run these via the command palette, or point the
+# extension's command-file setting at this file.
+#
+# The file extension is arbitrary; commands are one-per-line, '#' = comment.
+
+divider_add Clock/Reset
+variable_add tb_spi.clk
+variable_add tb_spi.rst_n
+
+divider_add SPI-Pins
+variable_add tb_spi.cs
+variable_add tb_spi.sclk
+variable_add tb_spi.mosi
+variable_add tb_spi.miso
+
+divider_add RX
+variable_add tb_spi.dut.cs_sync
+variable_add tb_spi.dut.mosi_sync
+variable_add tb_spi.dut.sclk_rising_edge
+variable_add tb_spi.dut.shift_in_reg
+variable_add tb_spi.dut.bit_count_in_byte
+variable_add tb_spi.received_data
+variable_add tb_spi.byte_ready
+
+divider_add TX
+variable_add tb_spi.state
+variable_add tb_spi.write_data
+variable_add tb_spi.dut.out_bit_count
+variable_add tb_spi.miso
+variable_add tb_spi.transmitted

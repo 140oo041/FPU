@@ -24,43 +24,67 @@ module fpu_core(
     wire[6:0] B_mant;
         assign B_mant = B[6:0];
 
+    wire A_implicit = |A_exp;
+    wire B_implicit = |B_exp;
+
+    wire[7:0] A_mant_full = {A_implicit, A_mant & {7{A_implicit}}};
+    wire[7:0] B_mant_full = {B_implicit, B_mant & {7{B_implicit}}};
+
     //ERROR FLAGS
+    wire raw_overflow, raw_underflow, raw_NAN;
+
     wire flag_A_NAN;
-        assign flag_A_NAN = (A[14:6] == 9'h1FF);
+        assign flag_A_NAN = (A_exp == 8'hFF) && (A_mant != 7'b0);
     wire flag_B_NAN;
-        assign flag_B_NAN = (B[14:6] == 9'h1FF);
+        assign flag_B_NAN = (B_exp == 8'hFF) && (B_mant != 7'b0);
+    wire either_nan;
+        assign either_nan = flag_A_NAN || flag_B_NAN;
+
+    //Don't check mantissa here because we flush subnormals to zero
+    wire A_is_zero;
+        assign A_is_zero = (A_exp == 8'h00);
+    wire B_is_zero;
+        assign B_is_zero = (B_exp == 8'h00);
+
+    wire either_zero;
+        assign either_zero = A_is_zero || B_is_zero;
+    wire both_zero;
+        assign both_zero = A_is_zero && B_is_zero;
 
     wire A_is_inf;
-        assign A_is_inf = (A[14:0] == 15'h7F80);
+        assign A_is_inf = ({A_exp, A_mant} == 15'h7F80);
     wire B_is_inf;
-        assign B_is_inf = (B[14:0] == 15'h7F80);
+        assign B_is_inf = ({B_exp, B_mant} == 15'h7F80);
+    wire either_inf;
+        assign either_inf = A_is_inf || B_is_inf;
+    wire both_inf;
+        assign both_inf = A_is_inf && B_is_inf;
 
     wire flag_div_by_zero;
-        assign flag_div_by_zero = (op == `DIV) && (A[14:0] != 0) && (B[14:0] == 0);
+        assign flag_div_by_zero = (op == `DIV) && (!A_is_zero) && B_is_zero;
 
-    //wire flag_NAN; output now
-        assign flag_NAN = (flag_A_NAN || flag_B_NAN) ||
-        // Infinity / Infinity
-        ((op == `DIV) && (A[14:0] == 15'h7F80) && (B[14:0] == 15'h7F80)) ||
-        
-        // 0 / 0
-        ((op == `DIV) && (A[14:0] == 15'h0000) && (B[14:0] == 15'h0000)) ||
-        
-        // 0 * Infinity or Infinity * 0
-        ((op == `MUL) && (A[14:0] == 15'h0000) && (B[14:0] == 15'h7F80)) ||
-        ((op == `MUL) && (A[14:0] == 15'h7F80) && (B[14:0] == 15'h0000)) ||
-        
-        // +Infinity + -Infinity
-        ((op == `ADD) && (A[14:0] == 15'h7F80) && (B[14:0] == 15'h7F80) && (A[15] != B[15])) ||
-        
-        // Infinity - Infinity
-        ((op == `SUB) && (A[14:0] == 15'h7F80) && (B[14:0] == 15'h7F80) && (A[15] == B[15]));                               
+    assign raw_NAN = either_nan ||
+                    // Infinity / Infinity
+                    ((op == `DIV) && both_inf) ||
+                    
+                    // 0 / 0
+                    ((op == `DIV) && both_zero) ||
+                    
+                    // 0 * Infinity or Infinity * 0
+                    ((op == `MUL) && ((A_is_zero && B_is_inf) ||
+                                    (A_is_inf  && B_is_zero))) ||
+                    
+                    // +Infinity + -Infinity
+                    ((op == `ADD) && both_inf && (A_sign != B_sign)) ||
+                    
+                    // Infinity - Infinity
+                    ((op == `SUB) && both_inf && (A_sign == B_sign));
 
     //MAGNITUDE COMPARISON
     wire a_greater;
-        assign a_greater = (A[14:0] > B[14:0]);
+        assign a_greater = ({A_exp, A_mant} > {B_exp, B_mant});
     wire a_b_equal;
-        assign a_b_equal = (A[14:0] == B[14:0]);
+        assign a_b_equal = ({A_exp, A_mant} == {B_exp, B_mant});    
     
     //SIGN GENERATION
     wire result_sign_wire;
@@ -86,17 +110,17 @@ module fpu_core(
     always @(*) begin
         if(a_greater) begin
             exp_diff = A_exp - B_exp;
-            mantissa_to_align = {1'b1, B_mant};
+            mantissa_to_align = B_mant_full;
             EXP_ADD_SUB_RAW = A_exp;
         end 
         
         else begin
             exp_diff = B_exp - A_exp;
-            mantissa_to_align = {1'b1, A_mant};
+            mantissa_to_align = A_mant_full;
             EXP_ADD_SUB_RAW = B_exp;
         end
         
-        shift_amt = exp_diff >= 4'hF ? 4'hF : exp_diff[3:0];
+        shift_amt = (exp_diff >= 4'hF) ? 4'hF : exp_diff[3:0];
     end
 
     alignment_shifter alignmentShifter(
@@ -112,8 +136,8 @@ module fpu_core(
     reg[11:0] MANT_ADD_SUB_RAW;
 
     wire[7:0] larger_mantissa;
-        assign larger_mantissa = a_greater ? {|A_exp, A_mant} : {|B_exp, B_mant};
-
+        assign larger_mantissa = a_greater ? A_mant_full : B_mant_full;
+    
     reg eff_op;
 
     always @(*) begin
@@ -140,16 +164,21 @@ module fpu_core(
     wire[7:0] recip_B;
     
     dividerLUT LUT(
-            .index(B_mant), .reciprocal(recip_B)
+            .index(B_mant_full[6:0]), .reciprocal(recip_B)
         );
 
+    wire recip_exact_pow2 = (B_mant_full[6:0] == 7'b0);
+
+    wire[7:0] recip_B_fixed;
+        assign recip_B_fixed = recip_exact_pow2 ? 8'b10000000 : recip_B;
+
     wire[7:0] dadda_wire;
-        assign dadda_wire = (op == `MUL) ? {1'b1, B_mant} : recip_B;
+        assign dadda_wire = (op == `MUL) ? B_mant_full : recip_B_fixed;
     
     wire[15:0] row1, row2;
     
     dadda_multiplier daddaMultiplier(
-            .a({1'b1, A_mant}),
+            .a(A_mant_full),
             .b(dadda_wire),
             .factor1(row1),
             .factor2(row2)
@@ -168,10 +197,33 @@ module fpu_core(
         assign MANT_MUL_DIV_RAW = (op == `MUL) ? MANT_MUL_RAW : MANT_DIV_RAW;
 
     //MULTIPLY/DIVIDE EXPONENT CALC
+    reg[8:0] exp_mul_div_raw_reg;
+    
+    wire [8:0] mul_sum = {1'b0, A_exp} + {1'b0, B_exp};
+    wire [8:0] div_sum = {1'b0, A_exp} + 9'd127 + {8'b0, recip_exact_pow2};
+
+    always @(*) begin
+        if(op == `MUL) begin
+            if(mul_sum >= 9'd127) 
+                exp_mul_div_raw_reg = mul_sum - 9'd127;
+            else 
+                exp_mul_div_raw_reg = 9'd0;
+        end 
+
+        else if(op == `DIV) begin
+            if(div_sum >= {1'b0, B_exp}) 
+                exp_mul_div_raw_reg = div_sum - {1'b0, B_exp};
+            else 
+                exp_mul_div_raw_reg = 9'd0;
+        end 
+
+        else begin
+            exp_mul_div_raw_reg = 9'd0;
+        end
+    end
+
     wire[8:0] EXP_MUL_DIV_RAW;
-        assign EXP_MUL_DIV_RAW = (op == `MUL) ? 
-        ({1'b0, A_exp} + {1'b0, B_exp} - 9'd127): 
-        ({1'b0, A_exp} - {1'b0, B_exp} + 9'd127);
+        assign EXP_MUL_DIV_RAW = exp_mul_div_raw_reg;
 
     //NORMALIZING
     reg[11:0] norm_mant_wire;
@@ -201,7 +253,7 @@ module fpu_core(
             .G(GRS[2]),
             .R(GRS[1]),
             .S(GRS[0]),
-            .flag_underflow(flag_underflow)
+            .flag_underflow(raw_underflow)
         );
 
     //ROUNDING
@@ -216,7 +268,7 @@ module fpu_core(
             .S(GRS[0]),
             .mantissa_out(result_mant_wire),
             .exp_out(result_exp_wire),
-            .flag_overflow(flag_overflow)
+            .flag_overflow(raw_overflow)
         );
     
     wire[15:0] arithmetic_result;
@@ -238,18 +290,33 @@ module fpu_core(
                 SLT = 16'h3F80;
         end
 
-        if(a_b_equal)
+        if(a_b_equal || either_nan)
             SLT = 16'h0000;
     end
 
-    //FINAL RESULT MUXING
+//FINAL RESULT MUXING
     wire is_arith;
     assign is_arith = (op==`ADD)||(op==`SUB)||(op==`MUL)||(op==`DIV);
 
-    //Catches cases where exponent isn't changed but result is known to be 0 (SUB)
     wire result_is_zero;
         assign result_is_zero = is_arith && (round_mant_wire == 8'b0);
 
+    wire deep_underflow_mul = (op == `MUL) && (mul_sum < 9'd127) && !either_zero;
+    
+    wire true_underflow = deep_underflow_mul || (raw_underflow && (result_exp_wire == 8'h00));
+    
+    wire div_overflow_bug = (op == `DIV) && !either_inf && !either_zero && 
+                            ({1'b0, A_exp} >= ({1'b0, B_exp} + 9'd128)) && (A_mant >= B_mant);
+
+    wire div_underflow_bug = (op == `DIV) && (A_mant == B_mant) && 
+                             ({1'b0, A_exp} + 9'd126 == {1'b0, B_exp}) && 
+                             !either_zero && !either_inf;
+
+    wire will_round_up = GRS[2] & (GRS[1] | GRS[0] | round_mant_wire[0]); 
+    wire mul_boundary_rescue = (op == `MUL) && (mul_sum == 9'd127) && (round_mant_wire == 8'h7F) && will_round_up;
+    
+    wire boundary_rescue = mul_boundary_rescue || div_underflow_bug;
+    
     always @(*) begin
         accumulate_enable = 1'b1;
         result = 16'b0;
@@ -264,23 +331,38 @@ module fpu_core(
             default: accumulate_enable = 1'b0;
         endcase
 
-        if(is_arith && (flag_overflow || flag_div_by_zero))
+        if(is_arith && (raw_overflow || div_overflow_bug || flag_div_by_zero))
             result = {result_sign_wire, 8'hFF, 7'h00};
-        if(is_arith && flag_underflow)
-            result = 16'b0;
+        
+        if(is_arith && true_underflow)
+            result = {result_sign_wire, 15'b0};
         
         if(result_is_zero)
-            result = 16'h0000;
-
+            result = {result_sign_wire, 15'b0};
+        
         if(op == `DIV && A_is_inf && !B_is_inf)
             result = {result_sign_wire, 8'hFF, 7'h00};
         if(op == `DIV && B_is_inf && !A_is_inf)
             result = {result_sign_wire, 8'h00, 7'h00};
-        if(op == `MUL && (A_is_inf || B_is_inf))
-            result = {result_sign_wire, 8'hFF, 7'h00};
 
-        if(flag_NAN)
+        if((op == `MUL || op == `ADD || op == `SUB) && either_inf)
+            result = {result_sign_wire, 8'hFF, 7'h00};            
+        
+        if(op == `MUL && either_zero)
+            result = {result_sign_wire, 15'b0};
+
+        //Only arith compute (mul, div, add, sub) can trigger flags
+        if(is_arith && flag_NAN)
             result = 16'h7FC0;
+            
+        if (boundary_rescue)
+            result = {result_sign_wire, 15'h0080};
     end
+    
+    assign flag_overflow = is_arith ? ((raw_overflow || div_overflow_bug) && !either_inf && !flag_div_by_zero && !raw_NAN) : 1'b0;    
+    
+    assign flag_underflow = is_arith ? (true_underflow && !either_inf && !either_zero && !raw_NAN && !boundary_rescue) : 1'b0;    
+    
+    assign flag_NAN = is_arith ? raw_NAN : 1'b0;
 
 endmodule

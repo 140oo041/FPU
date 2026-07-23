@@ -1,0 +1,163 @@
+module SPI (
+
+// operating signals
+  input wire clk,
+  input wire rst_n,
+
+//SPI signals
+  input wire sclk,
+  input wire cs,
+  input wire mosi,
+  output reg miso,
+
+// FSM signals
+  input wire [2:0] state,
+  output wire cs_sync_t,
+  output wire transmitted,
+  output wire error,
+
+
+// Writeback signals
+  input wire [7:0] status,
+  input wire [7:0] accumulated_data,
+
+// Receive signals
+  output wire [7:0] received_data,
+  output wire byte_ready
+
+
+
+
+);
+
+localparam IDLE = 3'b000;
+localparam RECEIVE = 3'b001;
+localparam PROCESS = 3'b010;
+localparam WRITEBACK = 3'b011;
+
+assign cs_sync_t = cs_sync;
+
+//synchronizer for mosi and miso
+  wire mosi_sync;
+
+  synchronizer mosi_sync_inst (
+    .clk(clk),
+    .rst_n(rst_n),
+    .async_in(mosi),
+    .sync_out(mosi_sync)
+  );
+
+  wire cs_sync;
+  synchronizer #(1'b1) cs_sync_inst (
+    .clk(clk),
+    .rst_n(rst_n),
+    .async_in(cs),
+    .sync_out(cs_sync)
+  );
+
+
+  //Edge detection for sclk
+  reg sclk_rising_edge;
+  wire sclk_sync;
+  reg FF3;
+
+  synchronizer sclk_sync_inst (
+    .clk(clk),
+    .rst_n(rst_n),
+    .async_in(sclk),
+    .sync_out(sclk_sync)
+  );
+
+
+  //sclk rising edge detection 
+  always @(posedge clk) begin
+    FF3 <= sclk_sync;
+    if (!rst_n) begin
+      sclk_rising_edge <= 1'b0;
+    end else begin
+      sclk_rising_edge <= sclk_sync & ~FF3;
+    end
+  end
+
+  // SPI logic here
+
+  reg [7:0] shift_reg;
+  wire [3:0] bit_count_in_byte;
+
+  //4 bit counter
+
+  byte_counter bit_counter_receive_inst (
+    .clk(clk),
+    .count_clk(cs_sync & sclk_rising_edge && state == RECEIVE),
+    .rst_n(rst_n),
+    .count(bit_count_in_byte)
+  );
+
+  always @(posedge clk) begin
+
+    if (!rst_n) begin
+      shift_reg <= 8'b0;
+    end
+    
+    else if (cs_sync & sclk_rising_edge && state == RECEIVE) begin
+      shift_reg <= {shift_reg[6:0], mosi_sync};
+    end 
+    
+    else if (state == IDLE) begin
+      shift_reg <= 8'b0;
+    end 
+    
+    else if (state == PROCESS) begin
+      shift_reg <= 8'b0;
+    end 
+    
+    else if (sclk_rising_edge && cs_sync && state == WRITEBACK) begin
+      if(out_bit_count <= 4'b0111) begin
+        shift_reg <= {shift_reg[6:0], status[out_bit_count]}; // Shift left and fill with 0
+        miso <= shift_reg[7]; // Send the MSB first
+      end else if (out_bit_count >= 4'b1000) begin
+        shift_reg <= {shift_reg[6:0], accumulated_data[out_bit_count[2:0]]}; // Hold the value after 8 bits have been sent
+        miso <= shift_reg[7]; // Send the MSB first
+        
+      end
+    end else if (state == WRITEBACK && !cs_sync) begin
+      shift_reg <= 8'b0;
+      miso <= 1'b0;
+    end
+  end
+
+  assign transmitted = (out_bit_count == 4'b1111) && cs_sync && sclk_rising_edge && state == WRITEBACK;
+
+  
+  wire[3:0] out_bit_count;
+
+  four_bit_counter bit_counter_writeback_inst (
+    .clk(clk),
+    .count_clk(cs_sync & sclk_rising_edge && state == WRITEBACK),
+    .rst_n(rst_n),
+    .count(out_bit_count)
+  );
+
+
+  assign  received_data = shift_reg;
+  assign  byte_ready = (bit_count_in_byte == 4'b1000) && cs_sync;
+
+  //CRC calculation
+  wire [7:0] crc_out;
+
+  CRC_Eight crc_inst (
+    .mosi(mosi_sync),
+    .rst_n(rst_n),
+    .clk(clk),
+    .sync_clk(sclk_rising_edge),
+    .crc(crc_out)
+  );
+
+  assign error = (crc_out != 8'h42) && byte_ready;
+
+
+
+
+
+
+endmodule

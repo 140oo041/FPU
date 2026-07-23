@@ -1,0 +1,80 @@
+module fsm (
+  
+  //operating signals
+  input wire clk,
+  input wire rst_n,
+
+
+  input wire cs_sync, // idle -> receive
+
+  input wire data_transmitted, // writeback -> idle
+
+  input wire data_ready, //receive -> process
+
+  input wire result_ready, //process -> writeback
+
+  output reg [2:0] next_state,
+  output reg [2:0] state
+);
+
+localparam IDLE = 3'b000;
+localparam RECEIVE = 3'b001;
+localparam PROCESS = 3'b010;
+localparam WRITEBACK = 3'b011;
+
+always @(*) begin
+  case(state)
+
+    IDLE: begin
+      if(cs_sync) begin
+        next_state = RECEIVE;
+      end else begin
+        next_state = IDLE;
+      end
+    end
+
+    RECEIVE: begin
+      if(data_ready) begin
+          next_state = PROCESS;
+        end
+      else begin
+        next_state = RECEIVE;
+      end
+    end
+
+    PROCESS: begin
+      if(result_ready) begin
+        next_state = WRITEBACK;
+      end else begin
+        next_state = PROCESS;
+      end
+    end
+
+    WRITEBACK: begin
+      if(data_transmitted) begin
+        next_state = IDLE;
+      end else begin
+        next_state = WRITEBACK;
+      end
+    end
+
+    default: begin
+      if(data_transmitted) begin
+        next_state = IDLE;
+      end else begin
+        next_state = WRITEBACK;
+      end
+    end
+
+  endcase
+end
+
+always @(posedge clk) begin
+  if(!rst_n) begin
+    state <= IDLE;
+  end else begin
+    state <= next_state;
+  end
+end
+
+endmodule

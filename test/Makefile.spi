@@ -1,0 +1,25 @@
+# Makefile for the SPI-only cocotb unit tests.
+# Run with:  make -f Makefile.spi
+# See https://docs.cocotb.org/en/stable/quickstart.html for more info
+
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+SRC_DIR = $(PWD)/../src
+
+# SPI block and its leaf modules (counters, synchronizer, CRC).
+PROJECT_SOURCES = SPI_copy.v
+PROJECT_SOURCES += misc.v
+
+SIM_BUILD = sim_build/spi
+VERILOG_SOURCES += $(addprefix $(SRC_DIR)/,$(PROJECT_SOURCES))
+
+# Allow `include from src/ (e.g. fpu_pkg.vh) if ever needed.
+COMPILE_ARGS += -I$(SRC_DIR)
+
+# Testbench wrapper + cocotb test module.
+VERILOG_SOURCES += $(PWD)/tb_spi.v
+TOPLEVEL = tb_spi
+COCOTB_TEST_MODULES = test_spi
+
+include $(shell cocotb-config --makefiles)/Makefile.sim

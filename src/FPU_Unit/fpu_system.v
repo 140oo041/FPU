@@ -30,12 +30,15 @@ module fpu_system(
             flag_underflow <= 1'b0;
         end
 
-        else if(data_ready && accumulate_register_enable) begin
-            accumulate_register <= datapath_result;
-            flag_NAN <= core_flag_NAN;
+        else if(data_ready) begin
+            if(accumulate_register_enable) begin
+                accumulate_register <= datapath_result;
+
+            end
+            result_ready <= 1'b1;
             flag_overflow <= core_flag_overflow;
             flag_underflow <= core_flag_underflow;
-            result_ready <= 1'b1;
+            flag_NAN <= core_flag_NAN;        
         end
         
         else begin
