@@ -18,7 +18,7 @@ module byte_counter (
         count[0] <= ~count[0];
         count[1] <= count[0] ^ count[1];
         count[2] <= (count[0] & count[1]) ^ count[2];
-        count[3] <= (count[0] & count[1] & count[2]) ^ count[3];
+        count[3] <= (count[0] & count[1] & count[2]);
       end
     end
   end
