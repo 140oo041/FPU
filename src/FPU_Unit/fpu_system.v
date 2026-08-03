@@ -1,4 +1,4 @@
-`include "fpu_pkg.vh"
+`include "fpu_pkg.v"
 
 module fpu_system(
     input clk,

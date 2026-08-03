@@ -1,4 +1,4 @@
-`include "fpu_pkg.vh"
+`include "fpu_pkg.v"
 
 module sign_gen(
     input wire a_greater,
