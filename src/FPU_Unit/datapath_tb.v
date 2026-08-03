@@ -1,5 +1,13 @@
 `timescale 1ns / 1ps
-`include "fpu_pkg.v"
+`ifndef FPU_PKG_VH
+`define FPU_PKG_VH
+`define ADD 2'b00
+`define SUB 2'b01
+`define MUL 2'b10
+`define DIV 2'b11
+`define ADD_EFF 1'b0
+`define SUB_EFF 1'b1
+`endif
 
 module datapath_tb();
     reg clk;
