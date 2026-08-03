@@ -21,7 +21,7 @@ project:
     - "SPI.v"
     - "fsm.v"
     - "misc.v"
-    - "FPU_Unit/fpu_pkg.vh"
+    - "fpu_pkg.vh"
     - "FPU_Unit/fpu_system.v"
     - "FPU_Unit/fpu_core.v"
     - "FPU_Unit/sign_gen.v"
