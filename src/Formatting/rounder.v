@@ -9,20 +9,21 @@ module rounder(
 
     reg round_up;
     reg[8:0] rounded_mantissa;
-    
-    reg[8:0] temp_exp; 
+    reg[8:0] temp_exp;
 
     always @(*) begin
         if(exp_in == 9'd0) begin
             round_up = mantissa_in[7] & (|mantissa_in[6:0] | G | R | S);
+        end else begin
+            round_up = G & (R | S | mantissa_in[0]);
+        end
+
+        rounded_mantissa = {1'b0, mantissa_in} + {8'b0, round_up};
+
+        if(exp_in == 9'd0) begin
             mantissa_out = 7'b0;
             temp_exp = round_up ? 9'd1 : 9'd0;
-        end 
-        
-        else begin
-            round_up = G & (R | S | mantissa_in[0]);
-            rounded_mantissa = {1'b0, mantissa_in} + {8'b0, round_up};
-
+        end else begin
             if(rounded_mantissa[8]) begin
                 mantissa_out = rounded_mantissa[7:1];
                 temp_exp = exp_in + 9'd1;

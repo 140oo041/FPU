@@ -10,6 +10,7 @@ module alignment_shifter(
 
     always @(*) begin
         wide = {mantissa_in, 11'b0};
+        shifted = wide >> shift_amt;
 
         if(shift_amt >= 5'd11) begin
             mantissa_out = 8'b0;
@@ -20,8 +21,6 @@ module alignment_shifter(
         end 
         
         else begin
-            shifted = wide >> shift_amt;
-            
             mantissa_out = shifted[18:11];
             G = shifted[10];
             R = shifted[9];
