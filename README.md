@@ -2,7 +2,7 @@
 
 # FPU-130
 
-FPU-130 is a floating-point coprocessor built around a compact, iterative `bfloat16` datapath. A host talks to it over SPI to issue commands and send operands, can stream operands faster through a parallel burst path, and gets back a `bfloat16` result along with status flags. The design is being developed toward tapeout on the SkyWater 130nm (Sky130) shuttle through Tiny Tapeout.
+FPU-130 is a floating-point coprocessor built around a compact, iterative `bfloat16` datapath. A host talks to it over SPI to issue commands and send operands, can stream operands faster through a parallel burst path, and gets back a `bfloat16` result along with status flags. The design targets Tiny Tapeout's IHP SG13G2 130nm shuttle.
 
 The full design spec is published at [140oo041.github.io/FPU](https://140oo041.github.io/FPU/); the source lives in [docs/FPU_Design_Spec_v0.4_1.html](docs/FPU_Design_Spec_v0.4_1.html). This repository also holds the project scaffolding and early RTL/testbench work — see [Project Status](#project-status) below for where things stand.
 
